@@ -29,4 +29,4 @@ npm run build
 
 ## License
 
-Licensed under the Apache License, Version 2.0. See `LICENSE` for details.
+This package is distributed under the **Business Source License (BSL)**. See [`LICENSE`](./LICENSE) for full terms.
