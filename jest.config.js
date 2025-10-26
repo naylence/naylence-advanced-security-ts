@@ -1,3 +1,38 @@
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const packageMappings = [
+  ['@naylence/core', '../naylence-core-ts/dist/cjs'],
+  ['@naylence/factory', '../naylence-factory-ts/dist/cjs'],
+  ['@naylence/runtime', '../naylence-runtime-ts/dist/cjs'],
+  ['naylence-core', '../naylence-core-ts/dist/cjs'],
+  ['naylence-core-ts', '../naylence-core-ts/dist/cjs'],
+  ['naylence-factory', '../naylence-factory-ts/dist/cjs'],
+  ['naylence-factory-ts', '../naylence-factory-ts/dist/cjs'],
+  ['naylence-runtime', '../naylence-runtime-ts/dist/cjs'],
+  ['naylence-runtime-ts', '../naylence-runtime-ts/dist/cjs'],
+];
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const moduleNameMapper = {
+  '^(\\.{1,2}/.*)\\.js$': '$1',
+};
+
+for (const [alias, relativeDir] of packageMappings) {
+  const aliasRegex = escapeRegex(alias);
+  const distDir = resolve(__dirname, relativeDir);
+  const indexPath = resolve(distDir, 'index.js');
+  const hasLocalBuild = existsSync(indexPath);
+
+  moduleNameMapper[`^${aliasRegex}$`] = hasLocalBuild ? indexPath : alias;
+  moduleNameMapper[`^${aliasRegex}/(.*)$`] = hasLocalBuild ? `${distDir}/$1` : `${alias}/$1`;
+}
+
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 export default {
   preset: 'ts-jest/presets/default-esm',
@@ -6,24 +41,7 @@ export default {
   roots: [
     '<rootDir>/src',
   ],
-  moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1',
-    '@naylence/core': '<rootDir>/../naylence-core-ts/dist/cjs/index.js',
-    '@naylence/core/(.*)$': '<rootDir>/../naylence-core-ts/dist/cjs/$1',
-    '@naylence/factory': '<rootDir>/../naylence-factory-ts/dist/cjs/index.js',
-    '@naylence/factory/(.*)$': '<rootDir>/../naylence-factory-ts/dist/cjs/$1',
-    '@naylence/runtime': '<rootDir>/../naylence-runtime-ts/dist/cjs/index.js',
-    '@naylence/runtime/(.*)$': '<rootDir>/../naylence-runtime-ts/dist/cjs/$1',
-    '^naylence-core/(.*)$': '<rootDir>/../naylence-core-ts/dist/cjs/$1',
-    '^naylence-core$': '<rootDir>/../naylence-core-ts/dist/cjs/index.js',
-    '^naylence-core-ts$': '<rootDir>/../naylence-core-ts/dist/cjs/index.js',
-    '^naylence-factory/(.*)$': '<rootDir>/../naylence-factory-ts/dist/cjs/$1',
-    '^naylence-factory$': '<rootDir>/../naylence-factory-ts/dist/cjs/index.js',
-    '^naylence-factory-ts$': '<rootDir>/../naylence-factory-ts/dist/cjs/index.js',
-    '^naylence-runtime/(.*)$': '<rootDir>/../naylence-runtime-ts/dist/cjs/$1',
-    '^naylence-runtime$': '<rootDir>/../naylence-runtime-ts/dist/cjs/index.js',
-    '^naylence-runtime-ts$': '<rootDir>/../naylence-runtime-ts/dist/cjs/index.js',
-  },
+  moduleNameMapper,
   transformIgnorePatterns: [
     'node_modules/(?!(@noble|yaml|jose)/)',
   ],
