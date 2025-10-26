@@ -3,7 +3,7 @@ import type {
   NodePlacementStrategy,
   TokenIssuer,
   TransportProvisioner,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 import {
   AdvancedWelcomeServiceFactory,
   FACTORY_META as ADVANCED_WELCOME_FACTORY_META,
@@ -14,17 +14,21 @@ import {
   NodePlacementStrategyFactory,
   TokenIssuerFactory,
   TransportProvisionerFactory,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 
 describe("AdvancedWelcomeServiceFactory", () => {
   beforeEach(() => {
-    jest.spyOn(NodePlacementStrategyFactory, "createNodePlacementStrategy").mockResolvedValue({
-      place: jest.fn(),
-    } as unknown as NodePlacementStrategy);
-    jest.spyOn(TransportProvisionerFactory, "createTransportProvisioner").mockResolvedValue({
-      provision: jest.fn(),
-      deprovision: jest.fn(),
-    } as unknown as TransportProvisioner);
+    jest
+      .spyOn(NodePlacementStrategyFactory, "createNodePlacementStrategy")
+      .mockResolvedValue({
+        place: jest.fn(),
+      } as unknown as NodePlacementStrategy);
+    jest
+      .spyOn(TransportProvisionerFactory, "createTransportProvisioner")
+      .mockResolvedValue({
+        provision: jest.fn(),
+        deprovision: jest.fn(),
+      } as unknown as TransportProvisioner);
     jest.spyOn(TokenIssuerFactory, "createTokenIssuer").mockResolvedValue({
       issue: jest.fn(),
     } as unknown as TokenIssuer);
@@ -51,14 +55,12 @@ describe("AdvancedWelcomeServiceFactory", () => {
     });
 
     expect(service).toBeInstanceOf(AdvancedWelcomeService);
-    expect(NodePlacementStrategyFactory.createNodePlacementStrategy).toHaveBeenCalledWith(
-      { type: "Static" },
-      undefined
-    );
-    expect(TransportProvisionerFactory.createTransportProvisioner).toHaveBeenCalledWith(
-      { type: "Mock" },
-      undefined
-    );
+    expect(
+      NodePlacementStrategyFactory.createNodePlacementStrategy,
+    ).toHaveBeenCalledWith({ type: "Static" }, undefined);
+    expect(
+      TransportProvisionerFactory.createTransportProvisioner,
+    ).toHaveBeenCalledWith({ type: "Mock" }, undefined);
     expect(TokenIssuerFactory.createTokenIssuer).toHaveBeenCalled();
     expect(AuthorizerFactory.createAuthorizer).toHaveBeenCalled();
   });
@@ -69,7 +71,7 @@ describe("AdvancedWelcomeServiceFactory", () => {
     await expect(
       factory.create({
         type: ADVANCED_WELCOME_FACTORY_META.key,
-      })
+      }),
     ).rejects.toThrow("caServiceUrl");
   });
 });

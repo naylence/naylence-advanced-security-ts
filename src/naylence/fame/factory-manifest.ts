@@ -13,9 +13,11 @@ export const MODULES = [
   "./security/encryption/default-secure-channel-manager-factory.js",
   "./security/encryption/sealed/x25519-encryption-manager-factory.js",
   "./security/keys/x5c-key-manager-factory.js",
+  "./security/signing/eddsa-envelope-signer-factory.js",
+  "./security/signing/eddsa-envelope-verifier-factory.js",
   "./stickiness/aft-load-balancer-stickiness-manager-factory.js",
   "./stickiness/aft-replica-stickiness-manager-factory.js",
-  "./welcome/advanced-welcome-service-factory.js"
+  "./welcome/advanced-welcome-service-factory.js",
 ] as const;
 
 export type FactoryModuleSpec = (typeof MODULES)[number];

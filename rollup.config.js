@@ -1,4 +1,5 @@
 import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
 import resolve from '@rollup/plugin-node-resolve';
 import { existsSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
@@ -24,6 +25,7 @@ export default {
       browser: true,
       preferBuiltins: false,
     }),
+    json(),
     commonjs(),
   ],
   external: (id) => 

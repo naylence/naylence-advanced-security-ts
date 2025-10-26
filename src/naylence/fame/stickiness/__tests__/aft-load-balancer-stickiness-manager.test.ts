@@ -1,12 +1,14 @@
-import type { FameEnvelope } from "naylence-core";
-import { DeliveryOriginType } from "naylence-core";
+import type { FameEnvelope } from "@naylence/core";
+import { DeliveryOriginType } from "@naylence/core";
 
 import { AFTLoadBalancerStickinessManager } from "../aft-load-balancer-stickiness-manager.js";
 import type { AFTLoadBalancerStickinessManagerConfig } from "../aft-load-balancer-stickiness-manager-factory.js";
 import type { AFTVerifier } from "../aft-verifier.js";
 import { StickinessMode } from "../stickiness-mode.js";
 
-function createConfig(overrides: Partial<AFTLoadBalancerStickinessManagerConfig> = {}): AFTLoadBalancerStickinessManagerConfig {
+function createConfig(
+  overrides: Partial<AFTLoadBalancerStickinessManagerConfig> = {},
+): AFTLoadBalancerStickinessManagerConfig {
   return {
     type: "AFTLoadBalancerStickinessManager",
     enabled: true,
@@ -42,7 +44,10 @@ describe("AFTLoadBalancerStickinessManager", () => {
       verify: jest.fn(async () => verification),
     };
 
-    const manager = new AFTLoadBalancerStickinessManager(createConfig(), verifier);
+    const manager = new AFTLoadBalancerStickinessManager(
+      createConfig(),
+      verifier,
+    );
 
     const outbound = createEnvelope({ set: { aft: "token-1" } });
     outbound.sid = "sid-1";
@@ -76,7 +81,10 @@ describe("AFTLoadBalancerStickinessManager", () => {
       verify: jest.fn(async () => verification),
     };
 
-    const manager = new AFTLoadBalancerStickinessManager(createConfig(), verifier);
+    const manager = new AFTLoadBalancerStickinessManager(
+      createConfig(),
+      verifier,
+    );
 
     const outbound = createEnvelope({ set: { aft: "tok-42" } });
     outbound.sid = "sid-42";
@@ -106,7 +114,7 @@ describe("AFTLoadBalancerStickinessManager", () => {
 
     const manager = new AFTLoadBalancerStickinessManager(
       createConfig({ securityLevel: StickinessMode.STRICT }),
-      verifier
+      verifier,
     );
 
     const outbound = createEnvelope({ set: { aft: "tok-strict" } });
@@ -134,7 +142,10 @@ describe("AFTLoadBalancerStickinessManager", () => {
       verify: jest.fn(async () => verification),
     };
 
-    const manager = new AFTLoadBalancerStickinessManager(createConfig({ cacheMax: 1 }), verifier);
+    const manager = new AFTLoadBalancerStickinessManager(
+      createConfig({ cacheMax: 1 }),
+      verifier,
+    );
 
     const first = createEnvelope({ set: { aft: "token-a" } });
     first.sid = "sid";
@@ -162,16 +173,18 @@ describe("AFTLoadBalancerStickinessManager", () => {
       verify: jest.fn(async () => verification),
     };
 
-    const manager = new AFTLoadBalancerStickinessManager(createConfig(), verifier);
+    const manager = new AFTLoadBalancerStickinessManager(
+      createConfig(),
+      verifier,
+    );
 
     const envelope = createEnvelope({ set: { aft: "tok-7" } });
     envelope.sid = "sid-7";
 
-    await manager.onDeliver(
-      {} as any,
-      envelope,
-      { originType: DeliveryOriginType.DOWNSTREAM, fromSystemId: "replica-7" } as any
-    );
+    await manager.onDeliver({} as any, envelope, {
+      originType: DeliveryOriginType.DOWNSTREAM,
+      fromSystemId: "replica-7",
+    } as any);
 
     expect(verifier.verify).toHaveBeenCalledWith("tok-7", "sid-7");
     expect(manager.getMetrics().associationsCreated).toBe(1);

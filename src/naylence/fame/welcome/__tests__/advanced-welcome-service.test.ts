@@ -1,10 +1,10 @@
-import type { NodeHelloFrame } from "naylence-core";
+import type { NodeHelloFrame } from "@naylence/core";
 import {
   type NodePlacementStrategy,
   type PlacementDecision,
   type TokenIssuer,
   type TransportProvisioner,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 
 import { GRANT_PURPOSE_CA_SIGN } from "../../security/cert/grants.js";
 import { AdvancedWelcomeService } from "../advanced-welcome-service.js";
@@ -57,7 +57,7 @@ describe("AdvancedWelcomeService", () => {
       connectionGrant: {
         type: "HttpConnectionGrant",
         purpose: "attach",
-        url: "https://edge.example"
+        url: "https://edge.example",
       },
     });
 
@@ -74,7 +74,9 @@ describe("AdvancedWelcomeService", () => {
 
     const frame = await service.handleHello(hello, metadata);
 
-    expect(placementStrategy.place).toHaveBeenCalledWith(expect.objectContaining({ systemId: expect.any(String) }));
+    expect(placementStrategy.place).toHaveBeenCalledWith(
+      expect.objectContaining({ systemId: expect.any(String) }),
+    );
     expect(tokenIssuer.issue).toHaveBeenNthCalledWith(1, {
       aud: decision.targetPhysicalPath,
       system_id: expect.any(String),
@@ -91,20 +93,23 @@ describe("AdvancedWelcomeService", () => {
       instance_id: metadata.instanceId,
     });
 
-    expect((transportProvisioner.provision as jest.Mock)).toHaveBeenCalledWith(
+    expect(transportProvisioner.provision as jest.Mock).toHaveBeenCalledWith(
       decision,
       expect.objectContaining({ systemId: expect.any(String) }),
       expect.objectContaining({ instanceId: metadata.instanceId }),
-      "attach-token"
+      "attach-token",
     );
 
     expect(frame.connectionGrants).toHaveLength(2);
     const caGrant = frame.connectionGrants?.[1] as Record<string, unknown>;
     expect(caGrant.purpose).toBe(GRANT_PURPOSE_CA_SIGN);
     expect(caGrant.url).toBe("https://ca.example");
-    expect((caGrant.auth as Record<string, unknown>).type).toBe("BearerTokenHeaderAuth");
+    expect((caGrant.auth as Record<string, unknown>).type).toBe(
+      "BearerTokenHeaderAuth",
+    );
     expect(
-      ((caGrant.auth as { tokenProvider?: { token?: string } }).tokenProvider?.token)
+      (caGrant.auth as { tokenProvider?: { token?: string } }).tokenProvider
+        ?.token,
     ).toBe("ca-token");
   });
 
@@ -122,7 +127,9 @@ describe("AdvancedWelcomeService", () => {
       caServiceUrl: "https://ca.example",
     });
 
-    await expect(service.handleHello(createHello())).rejects.toThrow("capacity");
+    await expect(service.handleHello(createHello())).rejects.toThrow(
+      "capacity",
+    );
   });
 
   it("still adds CA grant when no upstream system", async () => {
@@ -146,6 +153,8 @@ describe("AdvancedWelcomeService", () => {
 
     expect(frame.connectionGrants).toHaveLength(1);
     const [grant] = frame.connectionGrants ?? [];
-    expect(grant && (grant as { purpose?: string }).purpose).toBe(GRANT_PURPOSE_CA_SIGN);
+    expect(grant && (grant as { purpose?: string }).purpose).toBe(
+      GRANT_PURPOSE_CA_SIGN,
+    );
   });
 });

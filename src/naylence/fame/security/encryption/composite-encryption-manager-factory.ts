@@ -1,22 +1,24 @@
 import {
-    ENCRYPTION_MANAGER_FACTORY_BASE_TYPE,
-    EncryptionManagerFactory,
-    type EncryptionManagerConfig,
-    type EncryptionFactoryDependencies,
-    type EncryptionManager,
-    type EncryptionOptions,
-} from "naylence-runtime";
+  ENCRYPTION_MANAGER_FACTORY_BASE_TYPE,
+  EncryptionManagerFactory,
+  type EncryptionManagerConfig,
+  type EncryptionFactoryDependencies,
+  type EncryptionManager,
+  type EncryptionOptions,
+} from "@naylence/runtime";
 import type {
-    SecureChannelManager,
-    CryptoProvider,
-    KeyProvider,
-    NodeLike,
-} from "naylence-runtime";
-import { getLogger } from "naylence-runtime";
+  SecureChannelManager,
+  CryptoProvider,
+  KeyProvider,
+  NodeLike,
+} from "@naylence/runtime";
+import { getLogger } from "@naylence/runtime";
 
 import { CompositeEncryptionManager } from "./composite-encryption-manager.js";
 
-const logger = getLogger("naylence.advanced.encryption.composite.factory");
+const logger = getLogger(
+  "naylence.fame.security.encryption.composite_encryption_manager_factory",
+);
 
 const DEFAULT_PRIORITY = 1000;
 const DEFAULT_ENCRYPTION_TYPE = "composite" as const;
@@ -26,7 +28,8 @@ export const FACTORY_META = {
   key: "CompositeEncryptionManager",
 } as const;
 
-export interface CompositeEncryptionManagerConfig extends EncryptionManagerConfig {
+export interface CompositeEncryptionManagerConfig
+  extends EncryptionManagerConfig {
   readonly type: "CompositeEncryptionManager";
   readonly defaultAlgo?: string | null;
   readonly supportedSealedAlgorithms?: readonly string[] | null;
@@ -57,7 +60,8 @@ export class CompositeEncryptionManagerFactory extends EncryptionManagerFactory<
     this.supportedAlgorithms = config?.supportedAlgorithms ?? [];
     this.encryptionType = config?.encryptionType ?? DEFAULT_ENCRYPTION_TYPE;
     this.supportedSealedAlgorithms = config?.supportedSealedAlgorithms ?? null;
-    this.supportedChannelAlgorithms = config?.supportedChannelAlgorithms ?? null;
+    this.supportedChannelAlgorithms =
+      config?.supportedChannelAlgorithms ?? null;
   }
 
   public getSupportedAlgorithms(): readonly string[] {
@@ -76,14 +80,21 @@ export class CompositeEncryptionManagerFactory extends EncryptionManagerFactory<
     config?: CompositeEncryptionManagerConfig | Record<string, unknown> | null,
     ...factoryArgs: unknown[]
   ): Promise<EncryptionManager> {
-    const [dependencies] = factoryArgs as [EncryptionFactoryDependencies | undefined];
+    const [dependencies] = factoryArgs as [
+      EncryptionFactoryDependencies | undefined,
+    ];
     const resolved = this.resolveDependencies(dependencies);
 
-    const runtimeConfig = (config as Partial<CompositeEncryptionManagerConfig> | null) ?? null;
+    const runtimeConfig =
+      (config as Partial<CompositeEncryptionManagerConfig> | null) ?? null;
     const supportedSealedAlgorithms =
-      runtimeConfig?.supportedSealedAlgorithms ?? this.supportedSealedAlgorithms ?? undefined;
+      runtimeConfig?.supportedSealedAlgorithms ??
+      this.supportedSealedAlgorithms ??
+      undefined;
     const supportedChannelAlgorithms =
-      runtimeConfig?.supportedChannelAlgorithms ?? this.supportedChannelAlgorithms ?? undefined;
+      runtimeConfig?.supportedChannelAlgorithms ??
+      this.supportedChannelAlgorithms ??
+      undefined;
 
     logger.debug("creating_composite_encryption_manager", {
       has_secure_channel_manager: Boolean(resolved.secureChannelManager),
@@ -108,18 +119,20 @@ export class CompositeEncryptionManagerFactory extends EncryptionManagerFactory<
     });
   }
 
-  private resolveDependencies(dependencies?: EncryptionFactoryDependencies): ResolvedDependencies {
+  private resolveDependencies(
+    dependencies?: EncryptionFactoryDependencies,
+  ): ResolvedDependencies {
     const secureChannelManager = this.resolveSecureChannelManager(dependencies);
     if (!secureChannelManager) {
       throw new Error(
-        "CompositeEncryptionManager requires secureChannelManager dependency. Provide a SecureChannelManager instance."
+        "CompositeEncryptionManager requires secureChannelManager dependency. Provide a SecureChannelManager instance.",
       );
     }
 
     const keyProvider = this.resolveKeyProvider(dependencies);
     if (!keyProvider) {
       throw new Error(
-        "CompositeEncryptionManager requires keyProvider dependency. Provide a KeyProvider instance."
+        "CompositeEncryptionManager requires keyProvider dependency. Provide a KeyProvider instance.",
       );
     }
 
@@ -132,18 +145,24 @@ export class CompositeEncryptionManagerFactory extends EncryptionManagerFactory<
   }
 
   private resolveSecureChannelManager(
-    dependencies?: EncryptionFactoryDependencies
+    dependencies?: EncryptionFactoryDependencies,
   ): SecureChannelManager | null {
     if (!dependencies) {
       return null;
     }
 
-    const direct = dependencies.secureChannelManager as SecureChannelManager | undefined;
-    const snake = dependencies["secure_channel_manager"] as SecureChannelManager | undefined;
+    const direct = dependencies.secureChannelManager as
+      | SecureChannelManager
+      | undefined;
+    const snake = dependencies["secure_channel_manager"] as
+      | SecureChannelManager
+      | undefined;
     return direct ?? snake ?? null;
   }
 
-  private resolveKeyProvider(dependencies?: EncryptionFactoryDependencies): KeyProvider | null {
+  private resolveKeyProvider(
+    dependencies?: EncryptionFactoryDependencies,
+  ): KeyProvider | null {
     if (!dependencies) {
       return null;
     }
@@ -153,7 +172,9 @@ export class CompositeEncryptionManagerFactory extends EncryptionManagerFactory<
     return direct ?? snake ?? null;
   }
 
-  private resolveCryptoProvider(dependencies?: EncryptionFactoryDependencies): CryptoProvider | null {
+  private resolveCryptoProvider(
+    dependencies?: EncryptionFactoryDependencies,
+  ): CryptoProvider | null {
     if (!dependencies) {
       return null;
     }
@@ -163,7 +184,9 @@ export class CompositeEncryptionManagerFactory extends EncryptionManagerFactory<
     return direct ?? snake ?? null;
   }
 
-  private resolveNodeLike(dependencies?: EncryptionFactoryDependencies): NodeLike | null {
+  private resolveNodeLike(
+    dependencies?: EncryptionFactoryDependencies,
+  ): NodeLike | null {
     if (!dependencies) {
       return null;
     }

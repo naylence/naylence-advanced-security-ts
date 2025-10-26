@@ -1,5 +1,5 @@
 import { importPKCS8, SignJWT } from "jose";
-import { getLogger } from "naylence-runtime";
+import { getLogger } from "@naylence/runtime";
 
 import {
   createAftPayload,
@@ -10,7 +10,7 @@ import {
 import { base64UrlEncode } from "./aft-utils.js";
 import { StickinessMode } from "./stickiness-mode.js";
 
-const logger = getLogger("naylence.advanced.stickiness.aft-signer");
+const logger = getLogger("naylence.fame.stickiness.aft_signer");
 
 export interface SignAftOptions {
   readonly sid: string;
@@ -38,7 +38,10 @@ abstract class AbstractAFTSigner implements AFTSigner {
   public abstract signAft(options: SignAftOptions): Promise<string>;
 
   protected clampTtl(ttlSec: number | undefined): number {
-    const requested = typeof ttlSec === "number" && Number.isFinite(ttlSec) ? Math.max(0, ttlSec) : 0;
+    const requested =
+      typeof ttlSec === "number" && Number.isFinite(ttlSec)
+        ? Math.max(0, ttlSec)
+        : 0;
     if (this.maxTtlSec <= 0) {
       return 0;
     }
@@ -48,7 +51,10 @@ abstract class AbstractAFTSigner implements AFTSigner {
     return Math.min(Math.floor(requested), this.maxTtlSec);
   }
 
-  protected createPayload(options: SignAftOptions, algorithm: string): AFTPayload {
+  protected createPayload(
+    options: SignAftOptions,
+    algorithm: string,
+  ): AFTPayload {
     const ttl = this.clampTtl(options.ttlSec);
     return createAftPayload({
       sid: options.sid,
@@ -125,11 +131,17 @@ export class SignedAFTSigner extends AbstractAFTSigner {
       sid: payload.claims.sid,
     };
 
-    if (typeof payload.claims.scp === "string" && payload.claims.scp.length > 0) {
+    if (
+      typeof payload.claims.scp === "string" &&
+      payload.claims.scp.length > 0
+    ) {
       claimsPayload.scp = payload.claims.scp;
     }
 
-    if (typeof payload.claims.client_sid === "string" && payload.claims.client_sid.length > 0) {
+    if (
+      typeof payload.claims.client_sid === "string" &&
+      payload.claims.client_sid.length > 0
+    ) {
       claimsPayload.client_sid = payload.claims.client_sid;
     }
 
@@ -156,7 +168,10 @@ export class SignedAFTSigner extends AbstractAFTSigner {
 
   private async resolveKey(): Promise<CryptoKey> {
     if (!this.cryptoKeyPromise) {
-      this.cryptoKeyPromise = importPKCS8(this.privateKeyPem, this.algorithm).catch((error) => {
+      this.cryptoKeyPromise = importPKCS8(
+        this.privateKeyPem,
+        this.algorithm,
+      ).catch((error) => {
         this.cryptoKeyPromise = null;
         logger.error("aft_private_key_import_failed", {
           kid: this.kid,
@@ -180,7 +195,13 @@ export interface CreateAftSignerOptions {
 }
 
 export function createAftSigner(options: CreateAftSignerOptions): AFTSigner {
-  const { securityLevel, kid, privateKeyPem = null, algorithm = "EdDSA", maxTtlSec = 7200 } = options;
+  const {
+    securityLevel,
+    kid,
+    privateKeyPem = null,
+    algorithm = "EdDSA",
+    maxTtlSec = 7200,
+  } = options;
 
   switch (securityLevel) {
     case StickinessMode.STRICT: {
@@ -191,7 +212,12 @@ export function createAftSigner(options: CreateAftSignerOptions): AFTSigner {
     }
     case StickinessMode.SIGNED_OPTIONAL: {
       if (privateKeyPem) {
-        return new SignedAFTSigner({ kid, privateKeyPem, algorithm, maxTtlSec });
+        return new SignedAFTSigner({
+          kid,
+          privateKeyPem,
+          algorithm,
+          maxTtlSec,
+        });
       }
       return new UnsignedAFTSigner(kid, maxTtlSec);
     }

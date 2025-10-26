@@ -17,11 +17,15 @@ export interface AFTPayload {
   claims: AFTClaims;
 }
 
-export function isSignedAft(payload: AFTPayload | { header: AFTHeader }): boolean {
+export function isSignedAft(
+  payload: AFTPayload | { header: AFTHeader },
+): boolean {
   return payload.header.alg !== "none";
 }
 
-export function sanitizeStickinessScope(scope?: string | null): string | undefined {
+export function sanitizeStickinessScope(
+  scope?: string | null,
+): string | undefined {
   if (!scope) {
     return undefined;
   }

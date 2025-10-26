@@ -1,26 +1,26 @@
 import {
-    DeliveryOriginType,
-    NodeLike,
-    KeyManager,
-    KeyStore,
-    KeyRecord,
-    DefaultKeyManager,
-    getKeyStore,
-    getLogger,
-    currentTraceId,
-    validateJwkComplete,
-    JWKValidationError,
-    JsonWebKey,
-    TaskSpawner,
-    SpawnedTask,
-} from "naylence-runtime";
+  DeliveryOriginType,
+  NodeLike,
+  KeyManager,
+  KeyStore,
+  KeyRecord,
+  DefaultKeyManager,
+  getKeyStore,
+  getLogger,
+  currentTraceId,
+  validateJwkComplete,
+  JWKValidationError,
+  JsonWebKey,
+  TaskSpawner,
+  SpawnedTask,
+} from "@naylence/runtime";
 
 import {
   validateJwkX5cCertificate,
   type ValidateJwkX5cCertificateResult,
 } from "../cert/util.js";
 
-const logger = getLogger("naylence.advanced.keys.x5c");
+const logger = getLogger("naylence.fame.security.keys.x5c_key_manager");
 
 interface X509Module {
   X509Certificate: new (rawData: Uint8Array) => {
@@ -183,7 +183,9 @@ export class X5CKeyManager extends TaskSpawner implements KeyManager {
     }
 
     logger.debug("adding_keys", {
-      key_ids: validKeys.map((key) => (typeof key?.kid === "string" ? key.kid : "unknown")),
+      key_ids: validKeys.map((key) =>
+        typeof key?.kid === "string" ? key.kid : "unknown",
+      ),
       source_system_id: systemId,
       from_physical_path: physicalPath,
       trace_id: currentTraceId(),
@@ -191,6 +193,93 @@ export class X5CKeyManager extends TaskSpawner implements KeyManager {
       valid_count: validKeys.length,
       rejected_count: rejectedCount,
     });
+
+    const hasEncryptionKeys = validKeys.some(
+      (key) => typeof key?.use === "string" && key.use === "enc",
+    );
+
+    if (hasEncryptionKeys) {
+      logger.debug("checking_for_old_encryption_keys_to_remove", {
+        physical_path: physicalPath,
+        origin,
+        new_enc_keys: validKeys
+          .filter((key) => typeof key?.use === "string" && key.use === "enc")
+          .map((key) => (typeof key?.kid === "string" ? key.kid : "unknown")),
+      });
+
+      try {
+        const grouped = await this.keyStore.getKeysGroupedByPath();
+
+        const existingEncKeyIds = new Set<string>();
+        const pathsWithOldKeys: string[] = [];
+        const physicalPathSuffix = `@${physicalPath}`;
+
+        for (const [path, records] of Object.entries(grouped)) {
+          if (path !== physicalPath && !path.endsWith(physicalPathSuffix)) {
+            continue;
+          }
+
+          const encKeysAtPath = records.filter(
+            (record) => typeof record?.use === "string" && record.use === "enc",
+          );
+
+          if (encKeysAtPath.length === 0) {
+            continue;
+          }
+
+          pathsWithOldKeys.push(path);
+          for (const record of encKeysAtPath) {
+            if (typeof record?.kid === "string") {
+              existingEncKeyIds.add(record.kid);
+            }
+          }
+        }
+
+        if (existingEncKeyIds.size > 0) {
+          logger.debug("found_existing_encryption_keys_across_paths", {
+            physical_path: physicalPath,
+            paths_checked: pathsWithOldKeys,
+            existing_enc_key_ids: Array.from(existingEncKeyIds),
+          });
+
+          const newEncKeyIds = new Set(
+            validKeys
+              .filter(
+                (key) => typeof key?.use === "string" && key.use === "enc",
+              )
+              .map((key) => (typeof key?.kid === "string" ? key.kid : ""))
+              .filter((kid): kid is string => kid.length > 0),
+          );
+
+          const keysToRemove = Array.from(existingEncKeyIds).filter(
+            (kid) => !newEncKeyIds.has(kid),
+          );
+
+          if (keysToRemove.length > 0) {
+            logger.info("removing_old_encryption_keys_for_key_rotation", {
+              physical_path: physicalPath,
+              paths_with_old_keys: pathsWithOldKeys,
+              old_key_ids: keysToRemove,
+              new_key_ids: Array.from(newEncKeyIds),
+              origin,
+            });
+
+            for (const kid of keysToRemove) {
+              await this.keyStore.removeKey(kid);
+              logger.debug("removed_old_encryption_key_from_all_paths", {
+                kid,
+              });
+            }
+          }
+        }
+      } catch (error) {
+        logger.warning("failed_to_remove_old_encryption_keys", {
+          physical_path: physicalPath,
+          error: error instanceof Error ? error.message : String(error),
+          origin,
+        });
+      }
+    }
 
     const addKeyOptions: {
       keys: Array<Record<string, unknown>>;
@@ -236,7 +325,9 @@ export class X5CKeyManager extends TaskSpawner implements KeyManager {
     return this.inner.removeKeysForPath(physicalPath);
   }
 
-  public async getKeysForPath(physicalPath: string): Promise<Iterable<KeyRecord>> {
+  public async getKeysForPath(
+    physicalPath: string,
+  ): Promise<Iterable<KeyRecord>> {
     return this.inner.getKeysForPath(physicalPath);
   }
 
@@ -275,11 +366,16 @@ export class X5CKeyManager extends TaskSpawner implements KeyManager {
           if (expiration && expiration.getTime() < now.getTime()) {
             logger.debug("expired_certificate_found", {
               kid: typeof key.kid === "string" ? key.kid : "unknown",
-              physical_path: typeof key.physical_path === "string" ? key.physical_path : "unknown",
+              physical_path:
+                typeof key.physical_path === "string"
+                  ? key.physical_path
+                  : "unknown",
               expired_at: expiration.toISOString(),
             });
             if (typeof key.kid === "string") {
-              const removal: { kid: string; physicalPath?: string } = { kid: key.kid };
+              const removal: { kid: string; physicalPath?: string } = {
+                kid: key.kid,
+              };
               if (typeof key.physical_path === "string") {
                 removal.physicalPath = key.physical_path;
               }
@@ -327,53 +423,63 @@ export class X5CKeyManager extends TaskSpawner implements KeyManager {
       return;
     }
 
-    this.purgeTask = this.spawn(async (signal) => {
-      logger.debug("certificate_purge_loop_started", {
-        interval_seconds: this.certPurgeInterval,
-      });
+    this.purgeTask = this.spawn(
+      async (signal) => {
+        logger.debug("certificate_purge_loop_started", {
+          interval_seconds: this.certPurgeInterval,
+        });
 
-      try {
-        while (!signal?.aborted) {
-          const waitPromise = new Promise<void>((resolve) => {
-            const timeout = setTimeout(() => resolve(), this.certPurgeInterval * 1000);
-            if (signal) {
-              signal.addEventListener("abort", () => {
-                clearTimeout(timeout);
-                resolve();
-              }, { once: true });
+        try {
+          while (!signal?.aborted) {
+            const waitPromise = new Promise<void>((resolve) => {
+              const timeout = setTimeout(
+                () => resolve(),
+                this.certPurgeInterval * 1000,
+              );
+              if (signal) {
+                signal.addEventListener(
+                  "abort",
+                  () => {
+                    clearTimeout(timeout);
+                    resolve();
+                  },
+                  { once: true },
+                );
+              }
+            });
+
+            await waitPromise;
+            if (signal?.aborted) {
+              break;
             }
-          });
 
-          await waitPromise;
-          if (signal?.aborted) {
-            break;
-          }
-
-          try {
-            const purged = await this.purgeExpiredCertificates();
-            if (purged > 0) {
-              logger.debug("certificate_purge_cycle_completed", {
-                purged_count: purged,
+            try {
+              const purged = await this.purgeExpiredCertificates();
+              if (purged > 0) {
+                logger.debug("certificate_purge_cycle_completed", {
+                  purged_count: purged,
+                });
+              }
+            } catch (error) {
+              logger.error("certificate_purge_cycle_failed", {
+                error: error instanceof Error ? error.message : String(error),
               });
             }
-          } catch (error) {
-            logger.error("certificate_purge_cycle_failed", {
+          }
+        } catch (error) {
+          if (signal?.aborted) {
+            logger.debug("certificate_purge_loop_cancelled");
+          } else {
+            logger.error("certificate_purge_loop_failed", {
               error: error instanceof Error ? error.message : String(error),
             });
           }
+        } finally {
+          logger.debug("certificate_purge_loop_stopped");
         }
-      } catch (error) {
-        if (signal?.aborted) {
-          logger.debug("certificate_purge_loop_cancelled");
-        } else {
-          logger.error("certificate_purge_loop_failed", {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      } finally {
-        logger.debug("certificate_purge_loop_stopped");
-      }
-    }, { name: "cert-purge" });
+      },
+      { name: "cert-purge" },
+    );
   }
 }
 
@@ -390,7 +496,14 @@ function validateJwkX5cCertificateWrapper(options: {
   systemId: string;
   physicalPath: string;
 }): ValidationWrapperResult {
-  const { jwk, trustStore, enforceNameConstraints, origin, systemId, physicalPath } = options;
+  const {
+    jwk,
+    trustStore,
+    enforceNameConstraints,
+    origin,
+    systemId,
+    physicalPath,
+  } = options;
 
   let result: ValidateJwkX5cCertificateResult;
   try {
@@ -409,7 +522,12 @@ function validateJwkX5cCertificateWrapper(options: {
       error: error instanceof Error ? error.message : String(error),
       scenario: "node_attach",
     });
-    return { accepted: false, skip: origin === DeliveryOriginType.DOWNSTREAM || origin === DeliveryOriginType.UPSTREAM };
+    return {
+      accepted: false,
+      skip:
+        origin === DeliveryOriginType.DOWNSTREAM ||
+        origin === DeliveryOriginType.UPSTREAM,
+    };
   }
 
   if (result.isValid) {
@@ -427,7 +545,9 @@ function validateJwkX5cCertificateWrapper(options: {
 
   return {
     accepted: false,
-    skip: origin === DeliveryOriginType.DOWNSTREAM || origin === DeliveryOriginType.UPSTREAM,
+    skip:
+      origin === DeliveryOriginType.DOWNSTREAM ||
+      origin === DeliveryOriginType.UPSTREAM,
   };
 }
 

@@ -1,17 +1,18 @@
-import type { LoadBalancerStickinessManager } from "naylence-runtime";
+import type { LoadBalancerStickinessManager } from "@naylence/runtime";
 import {
-    LOAD_BALANCER_STICKINESS_MANAGER_FACTORY_BASE_TYPE,
-    LoadBalancerStickinessManagerFactory,
-    type LoadBalancerStickinessManagerConfig,
-} from "naylence-runtime";
-import type { KeyProvider } from "naylence-runtime";
+  LOAD_BALANCER_STICKINESS_MANAGER_FACTORY_BASE_TYPE,
+  LoadBalancerStickinessManagerFactory,
+  type LoadBalancerStickinessManagerConfig,
+} from "@naylence/runtime";
+import type { KeyProvider } from "@naylence/runtime";
 
 import { AFTLoadBalancerStickinessManager } from "./aft-load-balancer-stickiness-manager.js";
 import { createAftVerifier } from "./aft-verifier.js";
 import type { AFTVerifier } from "./aft-verifier.js";
 import { StickinessMode, normalizeStickinessMode } from "./stickiness-mode.js";
 
-export interface AFTLoadBalancerStickinessManagerConfig extends LoadBalancerStickinessManagerConfig {
+export interface AFTLoadBalancerStickinessManagerConfig
+  extends LoadBalancerStickinessManagerConfig {
   type: "AFTLoadBalancerStickinessManager";
   enabled?: boolean;
   clientEcho?: boolean;
@@ -47,7 +48,10 @@ function toNumber(value: unknown, fallback: number): number {
 }
 
 function normalizeConfig(
-  config?: AFTLoadBalancerStickinessManagerConfig | Record<string, unknown> | null
+  config?:
+    | AFTLoadBalancerStickinessManagerConfig
+    | Record<string, unknown>
+    | null,
 ): AFTLoadBalancerStickinessManagerConfig {
   const record = (config ?? {}) as Record<string, unknown>;
 
@@ -72,26 +76,36 @@ export class AFTLoadBalancerStickinessManagerFactory extends LoadBalancerStickin
   public readonly isDefault = false;
 
   public async create(
-    config?: AFTLoadBalancerStickinessManagerConfig | Record<string, unknown> | null,
+    config?:
+      | AFTLoadBalancerStickinessManagerConfig
+      | Record<string, unknown>
+      | null,
     keyProvider?: KeyProvider | null,
-    verifier?: AFTVerifier | null
+    verifier?: AFTVerifier | null,
   ): Promise<LoadBalancerStickinessManager> {
     const resolvedConfig = normalizeConfig(config);
 
     let effectiveVerifier = verifier ?? null;
     if (!effectiveVerifier && keyProvider) {
       effectiveVerifier = createAftVerifier({
-        securityLevel: resolvedConfig.securityLevel ?? DEFAULT_VALUES.securityLevel,
+        securityLevel:
+          resolvedConfig.securityLevel ?? DEFAULT_VALUES.securityLevel,
         keyProvider,
-        defaultTtlSec: resolvedConfig.defaultTtlSec ?? DEFAULT_VALUES.defaultTtlSec,
+        defaultTtlSec:
+          resolvedConfig.defaultTtlSec ?? DEFAULT_VALUES.defaultTtlSec,
       });
     }
 
     if (!effectiveVerifier) {
-      throw new Error("AFTLoadBalancerStickinessManagerFactory requires an AFT verifier or key provider");
+      throw new Error(
+        "AFTLoadBalancerStickinessManagerFactory requires an AFT verifier or key provider",
+      );
     }
 
-    return new AFTLoadBalancerStickinessManager(resolvedConfig, effectiveVerifier);
+    return new AFTLoadBalancerStickinessManager(
+      resolvedConfig,
+      effectiveVerifier,
+    );
   }
 }
 

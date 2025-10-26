@@ -1,13 +1,13 @@
 import { compactVerify, importJWK, importSPKI } from "jose";
-import type { KeyProvider } from "naylence-runtime";
-import type { KeyRecord } from "naylence-runtime";
-import { getLogger } from "naylence-runtime";
+import type { KeyProvider } from "@naylence/runtime";
+import type { KeyRecord } from "@naylence/runtime";
+import { getLogger } from "@naylence/runtime";
 
 import type { AFTClaims, AFTHeader } from "./aft-model.js";
 import { base64UrlDecode, utf8Decode } from "./aft-utils.js";
 import { StickinessMode } from "./stickiness-mode.js";
 
-const logger = getLogger("naylence.advanced.stickiness.aft-verifier");
+const logger = getLogger("naylence.fame.stickiness.aft_verifier");
 
 export type TrustLevel = "trusted" | "low-trust" | "untrusted";
 
@@ -27,7 +27,10 @@ type VerificationKey = ImportedJwkKey | ImportedSpkiKey;
 
 export interface AFTVerifier {
   readonly securityLevel: StickinessMode;
-  verify(token: string, expectedSid?: string | null): Promise<AFTVerificationResult>;
+  verify(
+    token: string,
+    expectedSid?: string | null,
+  ): Promise<AFTVerificationResult>;
 }
 
 interface DecodedToken {
@@ -67,7 +70,10 @@ function decodeToken(token: string): DecodedToken | null {
       claims.scp = payloadData.scp;
     }
 
-    if (typeof payloadData.client_sid === "string" && payloadData.client_sid.length > 0) {
+    if (
+      typeof payloadData.client_sid === "string" &&
+      payloadData.client_sid.length > 0
+    ) {
       claims.client_sid = payloadData.client_sid;
     }
 
@@ -92,10 +98,13 @@ abstract class BaseAFTVerifier implements AFTVerifier {
   protected abstract verifySignature(
     token: string,
     header: AFTHeader,
-    claims: AFTClaims
+    claims: AFTClaims,
   ): Promise<boolean>;
 
-  public async verify(token: string, expectedSid?: string | null): Promise<AFTVerificationResult> {
+  public async verify(
+    token: string,
+    expectedSid?: string | null,
+  ): Promise<AFTVerificationResult> {
     const decoded = decodeToken(token);
     if (!decoded) {
       return {
@@ -172,7 +181,8 @@ abstract class BaseAFTVerifier implements AFTVerifier {
       };
     }
 
-    const trustLevel: TrustLevel = header.alg === "none" ? "low-trust" : "trusted";
+    const trustLevel: TrustLevel =
+      header.alg === "none" ? "low-trust" : "trusted";
 
     return {
       valid: true,
@@ -197,7 +207,10 @@ export class StrictAFTVerifier extends BaseAFTVerifier {
     return StickinessMode.STRICT;
   }
 
-  protected async verifySignature(token: string, header: AFTHeader): Promise<boolean> {
+  protected async verifySignature(
+    token: string,
+    header: AFTHeader,
+  ): Promise<boolean> {
     if (header.alg === "none") {
       return false;
     }
@@ -235,7 +248,10 @@ export class StrictAFTVerifier extends BaseAFTVerifier {
 export class SignedOptionalAFTVerifier extends BaseAFTVerifier {
   private readonly keyProvider: KeyProvider | null;
 
-  public constructor(keyProvider: KeyProvider | null, defaultTtlSec: number = 30) {
+  public constructor(
+    keyProvider: KeyProvider | null,
+    defaultTtlSec: number = 30,
+  ) {
     super(defaultTtlSec);
     this.keyProvider = keyProvider;
   }
@@ -244,7 +260,10 @@ export class SignedOptionalAFTVerifier extends BaseAFTVerifier {
     return StickinessMode.SIGNED_OPTIONAL;
   }
 
-  protected async verifySignature(token: string, header: AFTHeader): Promise<boolean> {
+  protected async verifySignature(
+    token: string,
+    header: AFTHeader,
+  ): Promise<boolean> {
     if (header.alg === "none") {
       return true;
     }
@@ -292,7 +311,10 @@ export class SidOnlyAFTVerifier extends BaseAFTVerifier {
     return StickinessMode.SID_ONLY;
   }
 
-  public async verify(_token: string, _expectedSid?: string | null): Promise<AFTVerificationResult> {
+  public async verify(
+    _token: string,
+    _expectedSid?: string | null,
+  ): Promise<AFTVerificationResult> {
     return {
       valid: false,
       trustLevel: "untrusted",
@@ -307,13 +329,16 @@ export class SidOnlyAFTVerifier extends BaseAFTVerifier {
 
 async function resolveVerificationKey(
   keyRecord: KeyRecord,
-  algorithm: string
+  algorithm: string,
 ): Promise<VerificationKey | null> {
   const jwkCandidate = keyRecord as unknown as Record<string, unknown>;
 
   if (typeof jwkCandidate.kty === "string") {
     try {
-      const key = await importJWK(jwkCandidate as unknown as JsonWebKey, algorithm);
+      const key = await importJWK(
+        jwkCandidate as unknown as JsonWebKey,
+        algorithm,
+      );
       return key as VerificationKey;
     } catch (error) {
       logger.debug("aft_jwk_import_failed", {
@@ -358,7 +383,9 @@ export interface CreateAftVerifierOptions {
   defaultTtlSec?: number;
 }
 
-export function createAftVerifier(options: CreateAftVerifierOptions): AFTVerifier {
+export function createAftVerifier(
+  options: CreateAftVerifierOptions,
+): AFTVerifier {
   const { securityLevel, keyProvider, defaultTtlSec = 30 } = options;
 
   switch (securityLevel) {

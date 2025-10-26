@@ -1,4 +1,4 @@
-import { DeliveryOriginType } from "naylence-core";
+import { DeliveryOriginType } from "@naylence/core";
 
 import { AFTReplicaStickinessManager } from "../aft-replica-stickiness-manager.js";
 import type { AFTHelper } from "../aft-helper.js";
@@ -35,7 +35,11 @@ describe("AFTReplicaStickinessManager", () => {
 
     const offer = manager.offer();
 
-    expect(offer).toEqual({ mode: "aft", supportedModes: ["aft", "attr"], version: 1 });
+    expect(offer).toEqual({
+      mode: "aft",
+      supportedModes: ["aft", "attr"],
+      version: 1,
+    });
   });
 
   it("applies AFT when stickiness flag is set", async () => {
@@ -96,7 +100,11 @@ describe("AFTReplicaStickinessManager", () => {
     const helper = createHelperSpy();
     const manager = new AFTReplicaStickinessManager({ aftHelper: helper });
 
-    await manager.onNodeStarted({ id: "node", sid: "sid-123", cryptoProvider: {} } as any);
+    await manager.onNodeStarted({
+      id: "node",
+      sid: "sid-123",
+      cryptoProvider: {},
+    } as any);
 
     expect(helper.nodeSid).toBe("sid-123");
   });

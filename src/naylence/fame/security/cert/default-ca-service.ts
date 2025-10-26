@@ -5,7 +5,11 @@
  * loading from environment variables and test CA fallback.
  */
 
-import type { Authorizer, CertificateIssuanceResponse, CertificateSigningRequest } from "./ca-types.js";
+import type {
+  Authorizer,
+  CertificateIssuanceResponse,
+  CertificateSigningRequest,
+} from "./ca-types.js";
 import { CAService } from "./ca-types.js";
 import { CASigningService, createTestCA } from "./internal-ca-service.js";
 
@@ -123,9 +127,12 @@ export class DefaultCAService extends CAService {
 
     // Load intermediate chain
     if (!intermediateChainPem) {
-      const intermediateChainFile = process.env[ENV_FAME_INTERMEDIATE_CHAIN_FILE];
+      const intermediateChainFile =
+        process.env[ENV_FAME_INTERMEDIATE_CHAIN_FILE];
       if (intermediateChainFile) {
-        intermediateChainPem = await this.readFileIfExists(intermediateChainFile);
+        intermediateChainPem = await this.readFileIfExists(
+          intermediateChainFile,
+        );
       }
       if (!intermediateChainPem) {
         intermediateChainPem = process.env[ENV_FAME_INTERMEDIATE_CHAIN_PEM];
@@ -156,7 +163,9 @@ export class DefaultCAService extends CAService {
 
     // Fallback to test CA if nothing configured
     if (!caCertPem || !caKeyPem) {
-      console.warn("No CA credentials configured, using test CA (not for production!)");
+      console.warn(
+        "No CA credentials configured, using test CA (not for production!)",
+      );
       const [rootCert, rootKey] = await createTestCA();
       return {
         rootCaCertPem: rootCert,
@@ -182,7 +191,9 @@ export class DefaultCAService extends CAService {
    * @param filePath - Path to the file
    * @returns File contents or undefined if file doesn't exist
    */
-  private async readFileIfExists(filePath: string): Promise<string | undefined> {
+  private async readFileIfExists(
+    filePath: string,
+  ): Promise<string | undefined> {
     // Browser environment - files not supported
     if (typeof require === "undefined" && typeof window !== "undefined") {
       return undefined;
@@ -236,7 +247,9 @@ export class DefaultCAService extends CAService {
    * @param csr - Certificate signing request
    * @returns Certificate issuance response with the signed certificate
    */
-  async issueCertificate(csr: CertificateSigningRequest): Promise<CertificateIssuanceResponse> {
+  async issueCertificate(
+    csr: CertificateSigningRequest,
+  ): Promise<CertificateIssuanceResponse> {
     // Get CA credentials including intermediate chain
     const credentials = await this.getCACredentials();
 
@@ -252,7 +265,9 @@ export class DefaultCAService extends CAService {
       console.debug("Using signing certificate for signing:", csr.requesterId);
     } else if (credentials.intermediateChainPem) {
       // Extract the leaf certificate from the intermediate chain
-      const intermediateCerts = this.parseCertificateChain(credentials.intermediateChainPem);
+      const intermediateCerts = this.parseCertificateChain(
+        credentials.intermediateChainPem,
+      );
       if (intermediateCerts.length > 0 && credentials.signingKeyPem) {
         // Use the first certificate in the chain (should be the leaf/signing certificate)
         const leafCertPem = intermediateCerts[0];
@@ -260,14 +275,20 @@ export class DefaultCAService extends CAService {
           rootCertPem: leafCertPem!,
           rootKeyPem: credentials.signingKeyPem,
         });
-        console.debug("Using intermediate leaf CA for signing:", csr.requesterId);
+        console.debug(
+          "Using intermediate leaf CA for signing:",
+          csr.requesterId,
+        );
       } else {
         // Fall back to root CA if no signing key provided
         signingService = new CASigningService({
           rootCertPem: credentials.rootCaCertPem,
           rootKeyPem: credentials.rootCaKeyPem,
         });
-        console.warn("No signing key for intermediate, falling back to root:", csr.requesterId);
+        console.warn(
+          "No signing key for intermediate, falling back to root:",
+          csr.requesterId,
+        );
       }
     } else {
       // Sign with root CA

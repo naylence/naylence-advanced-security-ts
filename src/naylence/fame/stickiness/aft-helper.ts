@@ -1,11 +1,11 @@
-import type { FameDeliveryContext, FameEnvelope } from "naylence-core";
-import { getLogger } from "naylence-runtime";
+import type { FameDeliveryContext, FameEnvelope } from "@naylence/core";
+import { getLogger } from "@naylence/runtime";
 
 import type { AFTSigner, SignAftOptions } from "./aft-signer.js";
 import { createAftSigner, type CreateAftSignerOptions } from "./aft-signer.js";
 import { StickinessMode } from "./stickiness-mode.js";
 
-const logger = getLogger("naylence.advanced.stickiness.aft-helper");
+const logger = getLogger("naylence.fame.stickiness.aft_helper");
 
 export interface RequestStickinessOptions {
   readonly ttlSec?: number | null;
@@ -18,7 +18,11 @@ export class AFTHelper {
   public nodeSid: string;
   public readonly maxTtlSec: number;
 
-  public constructor(options: { signer: AFTSigner; nodeSid: string; maxTtlSec: number }) {
+  public constructor(options: {
+    signer: AFTSigner;
+    nodeSid: string;
+    maxTtlSec: number;
+  }) {
     this.signer = options.signer;
     this.nodeSid = options.nodeSid;
     this.maxTtlSec = options.maxTtlSec;
@@ -26,7 +30,7 @@ export class AFTHelper {
 
   public async requestStickiness(
     envelope: FameEnvelope,
-    options: RequestStickinessOptions = {}
+    options: RequestStickinessOptions = {},
   ): Promise<boolean> {
     const ttlSec = options.ttlSec ?? this.maxTtlSec;
     const scope = options.scope ?? null;
@@ -59,7 +63,10 @@ export class AFTHelper {
       let setMeta = envelope.meta.set as Record<string, unknown> | undefined;
       if (!setMeta || typeof setMeta !== "object") {
         setMeta = {};
-        envelope.meta.set = setMeta as Record<string, string | number | boolean>;
+        envelope.meta.set = setMeta as Record<
+          string,
+          string | number | boolean
+        >;
       }
 
       (setMeta as Record<string, unknown>).aft = aftToken;
@@ -83,21 +90,21 @@ export class AFTHelper {
 
   public requestNodeStickiness(
     envelope: FameEnvelope,
-    options: Omit<RequestStickinessOptions, "scope"> = {}
+    options: Omit<RequestStickinessOptions, "scope"> = {},
   ): Promise<boolean> {
     return this.requestStickiness(envelope, { ...options, scope: "node" });
   }
 
   public requestFlowStickiness(
     envelope: FameEnvelope,
-    options: Omit<RequestStickinessOptions, "scope"> = {}
+    options: Omit<RequestStickinessOptions, "scope"> = {},
   ): Promise<boolean> {
     return this.requestStickiness(envelope, { ...options, scope: "flow" });
   }
 
   public requestSessionStickiness(
     envelope: FameEnvelope,
-    options: Omit<RequestStickinessOptions, "scope"> = {}
+    options: Omit<RequestStickinessOptions, "scope"> = {},
   ): Promise<boolean> {
     return this.requestStickiness(envelope, { ...options, scope: "sess" });
   }

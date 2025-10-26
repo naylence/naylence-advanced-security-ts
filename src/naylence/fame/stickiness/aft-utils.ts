@@ -36,7 +36,11 @@ export function base64UrlEncode(data: string | Uint8Array): string {
 
     if (typeof btoa === "function") {
       base64 = btoa(binary);
-    } else if (typeof globalThis !== "undefined" && "btoa" in globalThis && typeof (globalThis as { btoa?: unknown }).btoa === "function") {
+    } else if (
+      typeof globalThis !== "undefined" &&
+      "btoa" in globalThis &&
+      typeof (globalThis as { btoa?: unknown }).btoa === "function"
+    ) {
       base64 = (globalThis as { btoa: (str: string) => string }).btoa(binary);
     } else {
       throw new Error("No base64 encoder available in this environment");
@@ -48,7 +52,8 @@ export function base64UrlEncode(data: string | Uint8Array): string {
 
 export function base64UrlDecode(data: string): Uint8Array {
   const normalized = data.replace(/-/gu, "+").replace(/_/gu, "/");
-  const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
+  const padding =
+    normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
   const base64 = normalized + padding;
 
   if (typeof Buffer !== "undefined") {
@@ -58,7 +63,11 @@ export function base64UrlDecode(data: string): Uint8Array {
   let binary: string;
   if (typeof atob === "function") {
     binary = atob(base64);
-  } else if (typeof globalThis !== "undefined" && "atob" in globalThis && typeof (globalThis as { atob?: unknown }).atob === "function") {
+  } else if (
+    typeof globalThis !== "undefined" &&
+    "atob" in globalThis &&
+    typeof (globalThis as { atob?: unknown }).atob === "function"
+  ) {
     binary = (globalThis as { atob: (str: string) => string }).atob(base64);
   } else {
     throw new Error("No base64 decoder available in this environment");

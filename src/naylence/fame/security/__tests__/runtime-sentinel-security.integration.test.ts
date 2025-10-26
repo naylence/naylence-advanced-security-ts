@@ -9,7 +9,7 @@ import {
   type AuthorizationContext,
   type FameDeliveryContext,
   type FameEnvelope,
-} from "naylence-core";
+} from "@naylence/core";
 
 import { SignJWT } from "jose";
 
@@ -29,7 +29,7 @@ import {
   type KeyRecord,
   basicConfig,
   LogLevel,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 
 jest.setTimeout(20000);
 
@@ -61,21 +61,25 @@ function createSecurityConfig(): Record<string, unknown> {
 
 function applySecurityConfigOverrides(
   config: Record<string, unknown>,
-  overrides?: SecurityConfigOverrides
+  overrides?: SecurityConfigOverrides,
 ): Record<string, unknown> {
   if (!overrides) {
     return config;
   }
 
   if ("cryptoProvider" in overrides) {
-    (config as Record<string, unknown>).cryptoProvider = overrides.cryptoProvider ?? null;
-    (config as Record<string, unknown>).crypto_provider = overrides.cryptoProvider ?? null;
+    (config as Record<string, unknown>).cryptoProvider =
+      overrides.cryptoProvider ?? null;
+    (config as Record<string, unknown>).crypto_provider =
+      overrides.cryptoProvider ?? null;
   }
 
   return config;
 }
 
-function createOverlaySecurityConfig(overrides?: SecurityConfigOverrides): Record<string, unknown> {
+function createOverlaySecurityConfig(
+  overrides?: SecurityConfigOverrides,
+): Record<string, unknown> {
   const baseConfig = {
     type: "DefaultSecurityManager",
     authorizer: { type: "NoopAuthorizer" },
@@ -129,11 +133,16 @@ function createOverlaySecurityConfig(overrides?: SecurityConfigOverrides): Recor
 }
 
 function createSigningOverlaySecurityConfig(
-  overrides?: SecurityConfigOverrides
+  overrides?: SecurityConfigOverrides,
 ): Record<string, unknown> {
   const config = createOverlaySecurityConfig(overrides);
-  const securityPolicy = (config.security_policy ?? {}) as Record<string, unknown>;
-  const encryption = { ...(securityPolicy.encryption as Record<string, unknown> | undefined) };
+  const securityPolicy = (config.security_policy ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const encryption = {
+    ...(securityPolicy.encryption as Record<string, unknown> | undefined),
+  };
 
   encryption.outbound = {
     ...((encryption.outbound as Record<string, unknown> | undefined) ?? {}),
@@ -161,7 +170,9 @@ function createSigningOverlaySecurityConfig(
   return applySecurityConfigOverrides(config, overrides);
 }
 
-function createGatedSecurityConfig(options: GatedSecurityConfigOptions): Record<string, unknown> {
+function createGatedSecurityConfig(
+  options: GatedSecurityConfigOptions,
+): Record<string, unknown> {
   const {
     issuer,
     hmacSecret,
@@ -236,13 +247,14 @@ function createGatedSecurityConfig(options: GatedSecurityConfigOptions): Record<
     authorizer,
   };
 
-  const overrides = cryptoProvider !== undefined ? { cryptoProvider } : undefined;
+  const overrides =
+    cryptoProvider !== undefined ? { cryptoProvider } : undefined;
   return applySecurityConfigOverrides(config, overrides);
 }
 
 async function waitForCondition(
   predicate: () => boolean,
-  timeoutMs = WAIT_TIMEOUT_MS
+  timeoutMs = WAIT_TIMEOUT_MS,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
@@ -264,7 +276,11 @@ async function waitForCondition(
 }
 
 function toKeyArray(
-  candidate: Record<string, unknown> | Array<Record<string, unknown>> | undefined | null
+  candidate:
+    | Record<string, unknown>
+    | Array<Record<string, unknown>>
+    | undefined
+    | null,
 ): Array<Record<string, unknown>> {
   if (!candidate) {
     return [];
@@ -276,7 +292,7 @@ async function waitForKeysForPath(
   manager: { getKeysForPath(path: string): Promise<Iterable<KeyRecord>> },
   path: string,
   minimumCount = 1,
-  timeoutMs = WAIT_TIMEOUT_MS
+  timeoutMs = WAIT_TIMEOUT_MS,
 ): Promise<Array<KeyRecord>> {
   const deadline = Date.now() + timeoutMs;
 
@@ -335,7 +351,9 @@ describe("Runtime Sentinel security integration (in advanced-security-ts)", () =
       parent = await sentinelFactory.create({
         type: "Sentinel",
         id: "parent-overlay-sentinel",
-        security: createOverlaySecurityConfig({ cryptoProvider: parentCryptoProvider }),
+        security: createOverlaySecurityConfig({
+          cryptoProvider: parentCryptoProvider,
+        }),
         admission: {
           type: "NoopAdmissionClient",
           autoAcceptLogicals: true,
@@ -381,7 +399,9 @@ describe("Runtime Sentinel security integration (in advanced-security-ts)", () =
         id: "child-overlay-node",
         hasParent: true,
         requestedLogicals: ["svc"],
-        security: createOverlaySecurityConfig({ cryptoProvider: childCryptoProvider }),
+        security: createOverlaySecurityConfig({
+          cryptoProvider: childCryptoProvider,
+        }),
         delivery: {
           type: "AtLeastOnceDeliveryPolicy",
         },
@@ -402,8 +422,11 @@ describe("Runtime Sentinel security integration (in advanced-security-ts)", () =
 
       await waitForCondition(() => child?.handshakeCompleted === true);
 
-      const routeManager = (parent as unknown as { routeManager: RouteManager }).routeManager;
-      await waitForCondition(() => routeManager.downstreamRoutes.has(child!.id));
+      const routeManager = (parent as unknown as { routeManager: RouteManager })
+        .routeManager;
+      await waitForCondition(() =>
+        routeManager.downstreamRoutes.has(child!.id),
+      );
 
       expect(child?.physicalPath).toMatch(/^\//);
 
@@ -419,14 +442,20 @@ describe("Runtime Sentinel security integration (in advanced-security-ts)", () =
       expect(parentOverlayManager.supportsOverlaySecurity).toBe(true);
       expect(childOverlayManager.supportsOverlaySecurity).toBe(true);
 
-      const parentShareableKeys = toKeyArray(parentOverlayManager.getShareableKeys());
-      const childShareableKeys = toKeyArray(childOverlayManager.getShareableKeys());
+      const parentShareableKeys = toKeyArray(
+        parentOverlayManager.getShareableKeys(),
+      );
+      const childShareableKeys = toKeyArray(
+        childOverlayManager.getShareableKeys(),
+      );
 
       expect(parentShareableKeys.length).toBeGreaterThan(0);
       expect(childShareableKeys.length).toBeGreaterThan(0);
 
-      const parentKeyManager = parentOverlayManager.keyManager as KeyManager | null;
-      const childKeyManager = childOverlayManager.keyManager as KeyManager | null;
+      const parentKeyManager =
+        parentOverlayManager.keyManager as KeyManager | null;
+      const childKeyManager =
+        childOverlayManager.keyManager as KeyManager | null;
 
       expect(parentKeyManager).toBeTruthy();
       expect(childKeyManager).toBeTruthy();
@@ -439,8 +468,9 @@ describe("Runtime Sentinel security integration (in advanced-security-ts)", () =
         (childKeyManager as unknown as { keyStore?: unknown }).keyStore ?? null;
       if (
         childInternalStore &&
-        typeof (childInternalStore as { getKeys?: () => Promise<Iterable<KeyRecord>> }).getKeys ===
-          "function"
+        typeof (
+          childInternalStore as { getKeys?: () => Promise<Iterable<KeyRecord>> }
+        ).getKeys === "function"
       ) {
         const rawKeysIterable = await (
           childInternalStore as { getKeys: () => Promise<Iterable<KeyRecord>> }
@@ -467,19 +497,33 @@ describe("Runtime Sentinel security integration (in advanced-security-ts)", () =
       // eslint-disable-next-line no-console
       console.log(
         "child keys for parent path (immediate)",
-        Array.from(await childKeyManager.getKeysForPath(parent!.physicalPath))
+        Array.from(await childKeyManager.getKeysForPath(parent!.physicalPath)),
       );
 
-      const parentStoredKeys = await waitForKeysForPath(parentKeyManager, child!.physicalPath);
-      const childStoredKeys = await waitForKeysForPath(childKeyManager, parent!.physicalPath);
+      const parentStoredKeys = await waitForKeysForPath(
+        parentKeyManager,
+        child!.physicalPath,
+      );
+      const childStoredKeys = await waitForKeysForPath(
+        childKeyManager,
+        parent!.physicalPath,
+      );
 
       expect(parentStoredKeys.length).toBeGreaterThanOrEqual(2);
       expect(childStoredKeys.length).toBeGreaterThanOrEqual(2);
 
-      const parentHasSigningKey = parentStoredKeys.some((key) => key.crv === "Ed25519");
-      const parentHasEncryptionKey = parentStoredKeys.some((key) => key.crv === "X25519");
-      const childHasSigningKey = childStoredKeys.some((key) => key.crv === "Ed25519");
-      const childHasEncryptionKey = childStoredKeys.some((key) => key.crv === "X25519");
+      const parentHasSigningKey = parentStoredKeys.some(
+        (key) => key.crv === "Ed25519",
+      );
+      const parentHasEncryptionKey = parentStoredKeys.some(
+        (key) => key.crv === "X25519",
+      );
+      const childHasSigningKey = childStoredKeys.some(
+        (key) => key.crv === "Ed25519",
+      );
+      const childHasEncryptionKey = childStoredKeys.some(
+        (key) => key.crv === "X25519",
+      );
 
       expect(parentHasSigningKey).toBe(true);
       expect(parentHasEncryptionKey).toBe(true);
@@ -487,10 +531,16 @@ describe("Runtime Sentinel security integration (in advanced-security-ts)", () =
       expect(childHasEncryptionKey).toBe(true);
 
       const parentStoredKeysMatch = parentStoredKeys.every((key) => {
-        return typeof key.physical_path === "string" && key.physical_path === child!.physicalPath;
+        return (
+          typeof key.physical_path === "string" &&
+          key.physical_path === child!.physicalPath
+        );
       });
       const childStoredKeysMatch = childStoredKeys.every((key) => {
-        return typeof key.physical_path === "string" && key.physical_path === parent!.physicalPath;
+        return (
+          typeof key.physical_path === "string" &&
+          key.physical_path === parent!.physicalPath
+        );
       });
 
       expect(parentStoredKeysMatch).toBe(true);

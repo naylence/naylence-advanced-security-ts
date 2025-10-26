@@ -3,14 +3,11 @@ import {
   EncryptionManagerFactory,
   type EncryptionManagerConfig,
   type EncryptionFactoryDependencies,
-} from "naylence-runtime";
-import type {
-  EncryptionManager,
-  EncryptionOptions,
-} from "naylence-runtime";
-import type { KeyProvider } from "naylence-runtime";
-import type { CryptoProvider } from "naylence-runtime";
-import type { NodeLike } from "naylence-runtime";
+} from "@naylence/runtime";
+import type { EncryptionManager, EncryptionOptions } from "@naylence/runtime";
+import type { KeyProvider } from "@naylence/runtime";
+import type { CryptoProvider } from "@naylence/runtime";
+import type { NodeLike } from "@naylence/runtime";
 import { X25519EncryptionManager } from "./x25519-encryption-manager.js";
 
 export interface X25519EncryptionManagerConfig extends EncryptionManagerConfig {
@@ -41,7 +38,8 @@ export class X25519EncryptionManagerFactory extends EncryptionManagerFactory<X25
 
   constructor(config?: Partial<X25519EncryptionManagerConfig> | null) {
     super();
-    this.supportedAlgorithms = config?.supportedAlgorithms ?? DEFAULT_SUPPORTED_ALGORITHMS;
+    this.supportedAlgorithms =
+      config?.supportedAlgorithms ?? DEFAULT_SUPPORTED_ALGORITHMS;
     this.encryptionType = config?.encryptionType ?? "sealed";
     this.priority = config?.priority ?? 100;
   }
@@ -66,21 +64,25 @@ export class X25519EncryptionManagerFactory extends EncryptionManagerFactory<X25
         opts.recipKid ||
         opts.recip_kid ||
         opts.recipientKeyId ||
-        opts.requestAddress
+        opts.requestAddress,
     );
   }
 
   public async create(
-  _config?: X25519EncryptionManagerConfig | Record<string, unknown> | null,
+    _config?: X25519EncryptionManagerConfig | Record<string, unknown> | null,
     ...factoryArgs: unknown[]
   ): Promise<EncryptionManager> {
-    const [dependencies] = factoryArgs as [EncryptionFactoryDependencies | undefined];
+    const [dependencies] = factoryArgs as [
+      EncryptionFactoryDependencies | undefined,
+    ];
     const keyProvider = this.resolveKeyProvider(dependencies);
     const cryptoProvider = this.resolveCryptoProvider(dependencies);
     const nodeLike = this.resolveNodeLike(dependencies);
 
     if (!keyProvider) {
-      throw new Error("X25519EncryptionManager requires a keyProvider dependency");
+      throw new Error(
+        "X25519EncryptionManager requires a keyProvider dependency",
+      );
     }
 
     return new X25519EncryptionManager({
@@ -90,7 +92,9 @@ export class X25519EncryptionManagerFactory extends EncryptionManagerFactory<X25
     });
   }
 
-  private resolveKeyProvider(dependencies?: EncryptionFactoryDependencies): KeyProvider | null {
+  private resolveKeyProvider(
+    dependencies?: EncryptionFactoryDependencies,
+  ): KeyProvider | null {
     if (!dependencies) {
       return null;
     }
@@ -101,7 +105,9 @@ export class X25519EncryptionManagerFactory extends EncryptionManagerFactory<X25
     );
   }
 
-  private resolveCryptoProvider(dependencies?: EncryptionFactoryDependencies): CryptoProvider | null {
+  private resolveCryptoProvider(
+    dependencies?: EncryptionFactoryDependencies,
+  ): CryptoProvider | null {
     if (!dependencies) {
       return null;
     }
@@ -113,7 +119,9 @@ export class X25519EncryptionManagerFactory extends EncryptionManagerFactory<X25
     );
   }
 
-  private resolveNodeLike(dependencies?: EncryptionFactoryDependencies): NodeLike | null {
+  private resolveNodeLike(
+    dependencies?: EncryptionFactoryDependencies,
+  ): NodeLike | null {
     if (!dependencies) {
       return null;
     }

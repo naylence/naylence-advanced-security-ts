@@ -64,7 +64,9 @@ export abstract class CAService {
    * @param csr - Certificate signing request
    * @returns Certificate issuance response with the signed certificate
    */
-  abstract issueCertificate(csr: CertificateSigningRequest): Promise<CertificateIssuanceResponse>;
+  abstract issueCertificate(
+    csr: CertificateSigningRequest,
+  ): Promise<CertificateIssuanceResponse>;
 }
 
 /**

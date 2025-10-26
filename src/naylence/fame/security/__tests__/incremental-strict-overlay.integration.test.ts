@@ -11,7 +11,7 @@ import {
   type FameAddress,
   type FameDeliveryContext,
   type FameEnvelope,
-} from "naylence-core";
+} from "@naylence/core";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 
 import {
@@ -30,7 +30,7 @@ import {
   type KeyRecord,
   LogLevel,
   basicConfig,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 
 import {
   setupTestCACredentials,
@@ -49,15 +49,17 @@ interface SecurityConfigOverrides {
 
 function applySecurityConfigOverrides(
   config: Record<string, unknown>,
-  overrides?: SecurityConfigOverrides
+  overrides?: SecurityConfigOverrides,
 ): Record<string, unknown> {
   if (!overrides) {
     return config;
   }
 
   if ("cryptoProvider" in overrides) {
-    (config as Record<string, unknown>).cryptoProvider = overrides.cryptoProvider ?? null;
-    (config as Record<string, unknown>).crypto_provider = overrides.cryptoProvider ?? null;
+    (config as Record<string, unknown>).cryptoProvider =
+      overrides.cryptoProvider ?? null;
+    (config as Record<string, unknown>).crypto_provider =
+      overrides.cryptoProvider ?? null;
   }
 
   return config;
@@ -65,7 +67,7 @@ function applySecurityConfigOverrides(
 
 async function waitForCondition(
   predicate: () => boolean,
-  timeoutMs = WAIT_TIMEOUT_MS
+  timeoutMs = WAIT_TIMEOUT_MS,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
@@ -90,7 +92,7 @@ async function waitForKeysForPath(
   manager: { getKeysForPath(path: string): Promise<Iterable<KeyRecord>> },
   path: string,
   minimumCount = 1,
-  timeoutMs = WAIT_TIMEOUT_MS
+  timeoutMs = WAIT_TIMEOUT_MS,
 ): Promise<Array<KeyRecord>> {
   const deadline = Date.now() + timeoutMs;
 
@@ -253,8 +255,11 @@ describe("Incremental strict-overlay security integration", () => {
       await child.start();
       await waitForCondition(() => child?.handshakeCompleted === true);
 
-      const routeManager = (parent as unknown as { routeManager: RouteManager }).routeManager;
-      await waitForCondition(() => routeManager.downstreamRoutes.has(child!.id));
+      const routeManager = (parent as unknown as { routeManager: RouteManager })
+        .routeManager;
+      await waitForCondition(() =>
+        routeManager.downstreamRoutes.has(child!.id),
+      );
 
       expect(child?.physicalPath).toMatch(/^\//);
       expect(parent.securityManager).toBeInstanceOf(DefaultSecurityManager);
@@ -445,8 +450,11 @@ describe("Incremental strict-overlay security integration", () => {
       await child.start();
       await waitForCondition(() => child?.handshakeCompleted === true);
 
-      const routeManager = (parent as unknown as { routeManager: RouteManager }).routeManager;
-      await waitForCondition(() => routeManager.downstreamRoutes.has(child!.id));
+      const routeManager = (parent as unknown as { routeManager: RouteManager })
+        .routeManager;
+      await waitForCondition(() =>
+        routeManager.downstreamRoutes.has(child!.id),
+      );
 
       expect(child?.physicalPath).toMatch(/^\//);
     } finally {
@@ -458,7 +466,9 @@ describe("Incremental strict-overlay security integration", () => {
         await parent.stop();
       }
       if (jwksServer) {
-        await new Promise<void>((resolve) => jwksServer!.close(() => resolve()));
+        await new Promise<void>((resolve) =>
+          jwksServer!.close(() => resolve()),
+        );
       }
     }
   });
@@ -654,8 +664,11 @@ describe("Incremental strict-overlay security integration", () => {
       await child.start();
       await waitForCondition(() => child?.handshakeCompleted === true);
 
-      const routeManager = (parent as unknown as { routeManager: RouteManager }).routeManager;
-      await waitForCondition(() => routeManager.downstreamRoutes.has(child!.id));
+      const routeManager = (parent as unknown as { routeManager: RouteManager })
+        .routeManager;
+      await waitForCondition(() =>
+        routeManager.downstreamRoutes.has(child!.id),
+      );
 
       expect(child?.physicalPath).toMatch(/^\//);
     } finally {
@@ -667,7 +680,9 @@ describe("Incremental strict-overlay security integration", () => {
         await parent.stop();
       }
       if (jwksServer) {
-        await new Promise<void>((resolve) => jwksServer!.close(() => resolve()));
+        await new Promise<void>((resolve) =>
+          jwksServer!.close(() => resolve()),
+        );
       }
     }
   });
@@ -675,7 +690,7 @@ describe("Incremental strict-overlay security integration", () => {
   test("Step 4: Use SecurityProfile strict-overlay (X.509 certificates)", async () => {
     // NOTE: Certificate infrastructure is ported and working correctly:
     // - Certificates successfully load from environment variables
-    // - Certificate material applied to crypto provider  
+    // - Certificate material applied to crypto provider
     // - nodeJwk() adds x5c field correctly
     //
     // CORE ISSUE: Envelopes are NOT being signed despite having valid crypto provider
@@ -848,8 +863,11 @@ describe("Incremental strict-overlay security integration", () => {
       await child.start();
       await waitForCondition(() => child?.handshakeCompleted === true);
 
-      const routeManager = (parent as unknown as { routeManager: RouteManager }).routeManager;
-      await waitForCondition(() => routeManager.downstreamRoutes.has(child!.id));
+      const routeManager = (parent as unknown as { routeManager: RouteManager })
+        .routeManager;
+      await waitForCondition(() =>
+        routeManager.downstreamRoutes.has(child!.id),
+      );
 
       expect(child?.physicalPath).toMatch(/^\//);
       expect(parent.securityManager).toBeInstanceOf(DefaultSecurityManager);
@@ -862,16 +880,18 @@ describe("Incremental strict-overlay security integration", () => {
         // Wait for connector cleanup to complete (receive-loop has 1000ms shutdown timeout)
         await new Promise((resolve) => setTimeout(resolve, 1200));
       }
-      
-      // 2. Stop parent (which hosts the HTTP server)  
+
+      // 2. Stop parent (which hosts the HTTP server)
       if (parent) {
         await parent.stop();
       }
-      
+
       // 3. Clean up other resources
       caCredentials?.cleanup();
       if (jwksServer) {
-        await new Promise<void>((resolve) => jwksServer!.close(() => resolve()));
+        await new Promise<void>((resolve) =>
+          jwksServer!.close(() => resolve()),
+        );
       }
     }
   });
@@ -1023,41 +1043,51 @@ describe("Incremental strict-overlay security integration", () => {
       await child.start();
       await waitForCondition(() => child?.handshakeCompleted === true);
 
-      const routeManager = (parent as unknown as { routeManager: RouteManager }).routeManager;
-      await waitForCondition(() => routeManager.downstreamRoutes.has(child!.id));
+      const routeManager = (parent as unknown as { routeManager: RouteManager })
+        .routeManager;
+      await waitForCondition(() =>
+        routeManager.downstreamRoutes.has(child!.id),
+      );
 
       expect(child?.physicalPath).toMatch(/^\//);
 
       // Send a test message to verify channel encryption is actually enabled
-      const testData = { test: "encryption-verification", timestamp: Date.now() };
+      const testData = {
+        test: "encryption-verification",
+        timestamp: Date.now(),
+      };
       const testEnvelope = child.envelopeFactory.createEnvelope({
         frame: {
           type: "Data",
           codec: "json",
           payload: testData,
         },
-        to: formatAddress("__sys__", parent.physicalPath!),  // Send to parent's system inbox
+        to: formatAddress("__sys__", parent.physicalPath!), // Send to parent's system inbox
       });
-      
+
       // Track encryption by checking security handler logs
       let encryptionApplied = false;
       const originalLog = console.log;
-      const logSpy = jest.spyOn(console, 'log').mockImplementation((message) => {
-        if (typeof message === 'string' && 
-            message.includes('outbound_crypto_level_decided') && 
-            message.includes('crypto_level=channel')) {
-          encryptionApplied = true;
-        }
-        originalLog.call(console, message);
-      });
+      const logSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation((message) => {
+          if (
+            typeof message === "string" &&
+            message.includes("outbound_crypto_level_decided") &&
+            message.includes("crypto_level=channel")
+          ) {
+            encryptionApplied = true;
+          }
+          originalLog.call(console, message);
+        });
 
       await child.send(testEnvelope);
-      
+
       // Wait a bit for encryption processing
       await new Promise((resolve) => setTimeout(resolve, 100));
-      
+
       logSpy.mockRestore();
-      
+
       // Verify that channel encryption was applied to the Data frame
       expect(encryptionApplied).toBe(true);
     } finally {
@@ -1069,7 +1099,9 @@ describe("Incremental strict-overlay security integration", () => {
         await parent.stop();
       }
       if (jwksServer) {
-        await new Promise<void>((resolve) => jwksServer!.close(() => resolve()));
+        await new Promise<void>((resolve) =>
+          jwksServer!.close(() => resolve()),
+        );
       }
     }
   });
@@ -1127,7 +1159,7 @@ describe("Incremental strict-overlay security integration", () => {
           FAME_JWT_TRUSTED_ISSUER: issuer,
           FAME_JWKS_URL: jwksUrl,
           FAME_DEFAULT_ENCRYPTION_LEVEL: "sealed", // ENABLE SEALED ENCRYPTION
-          FAME_SHOW_ENVELOPES: "true"
+          FAME_SHOW_ENVELOPES: "true",
         },
         security: {
           type: "SecurityProfile",
@@ -1226,47 +1258,57 @@ describe("Incremental strict-overlay security integration", () => {
       await child.start();
       await waitForCondition(() => child?.handshakeCompleted === true);
 
-      const routeManager = (parent as unknown as { routeManager: RouteManager }).routeManager;
-      await waitForCondition(() => routeManager.downstreamRoutes.has(child!.id));
+      const routeManager = (parent as unknown as { routeManager: RouteManager })
+        .routeManager;
+      await waitForCondition(() =>
+        routeManager.downstreamRoutes.has(child!.id),
+      );
 
       expect(child?.physicalPath).toMatch(/^\//);
 
       // Send a test message to verify sealed encryption is actually enabled
-      const testData = { test: "sealed-encryption-verification", timestamp: Date.now() };
+      const testData = {
+        test: "sealed-encryption-verification",
+        timestamp: Date.now(),
+      };
       const testEnvelope = child.envelopeFactory.createEnvelope({
         frame: {
           type: "Data",
           codec: "json",
           payload: testData,
         },
-        to: formatAddress("__sys__", parent.physicalPath!),  // Send to parent's system inbox
+        to: formatAddress("__sys__", parent.physicalPath!), // Send to parent's system inbox
       });
-      
+
       // Track encryption by checking security handler logs
       let encryptionApplied = false;
       const originalLog = console.log;
-      const logSpy = jest.spyOn(console, 'log').mockImplementation((message) => {
-        if (typeof message === 'string') {
-          // Check that sealed encryption was decided
-          if (message.includes('outbound_crypto_level_decided') && 
-              message.includes('crypto_level=sealed')) {
-            encryptionApplied = true;
+      const logSpy = jest
+        .spyOn(console, "log")
+        .mockImplementation((message) => {
+          if (typeof message === "string") {
+            // Check that sealed encryption was decided
+            if (
+              message.includes("outbound_crypto_level_decided") &&
+              message.includes("crypto_level=sealed")
+            ) {
+              encryptionApplied = true;
+            }
+            // Check for encryption being skipped (should NOT happen)
+            if (message.includes("envelope_encryption_skipped")) {
+              encryptionApplied = false;
+            }
           }
-          // Check for encryption being skipped (should NOT happen)
-          if (message.includes('envelope_encryption_skipped')) {
-            encryptionApplied = false;
-          }
-        }
-        originalLog.call(console, message);
-      });
+          originalLog.call(console, message);
+        });
 
       await child.send(testEnvelope);
-      
+
       // Wait a bit for encryption processing
       await new Promise((resolve) => setTimeout(resolve, 100));
-      
+
       logSpy.mockRestore();
-      
+
       // Verify that sealed encryption was applied to the Data frame
       expect(encryptionApplied).toBe(true);
     } finally {
@@ -1277,7 +1319,9 @@ describe("Incremental strict-overlay security integration", () => {
         await parent.stop();
       }
       if (jwksServer) {
-        await new Promise<void>((resolve) => jwksServer!.close(() => resolve()));
+        await new Promise<void>((resolve) =>
+          jwksServer!.close(() => resolve()),
+        );
       }
       // Wait for WebSocket receive-loop to fully shut down (has 1s join timeout)
       await new Promise((resolve) => setTimeout(resolve, 1200));

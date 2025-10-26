@@ -1,4 +1,4 @@
-import type { SecureAcceptFrame } from "naylence-core";
+import type { SecureAcceptFrame } from "@naylence/core";
 import { DefaultSecureChannelManager } from "../default-secure-channel-manager.js";
 import { DefaultSecureChannelManagerFactory } from "../default-secure-channel-manager-factory.js";
 
@@ -32,7 +32,7 @@ describe("DefaultSecureChannelManager", () => {
     expect(clientState?.key.length).toBe(32);
     expect(serverState?.key.length).toBe(32);
     expect(Buffer.from(clientState!.key).toString("hex")).toBe(
-      Buffer.from(serverState!.key).toString("hex")
+      Buffer.from(serverState!.key).toString("hex"),
     );
     expect(clientState?.noncePrefix.length).toBe(4);
     expect(serverState?.noncePrefix.length).toBe(4);
@@ -75,7 +75,7 @@ describe("DefaultSecureChannelManager", () => {
         ok: true,
         ephPub: open.ephPub,
         alg: open.alg,
-      })
+      }),
     ).resolves.toBe(false);
   });
 

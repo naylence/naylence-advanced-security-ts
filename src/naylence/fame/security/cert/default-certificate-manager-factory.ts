@@ -1,20 +1,21 @@
-import type { SecuritySettings } from "naylence-core";
-import { SigningConfigClass } from "naylence-runtime";
+import type { SecuritySettings } from "@naylence/core";
+import { SigningConfigClass } from "@naylence/runtime";
 import {
   CertificateManagerFactory,
   CERTIFICATE_MANAGER_FACTORY_BASE_TYPE,
   type CertificateManagerConfig,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 
 import {
   DefaultCertificateManager,
   type DefaultCertificateManagerOptions,
   type SigningConfigInstance,
 } from "./default-certificate-manager.js";
-import type { SigningConfig } from "naylence-runtime";
-import type { CertificateManager } from "naylence-runtime";
+import type { SigningConfig } from "@naylence/runtime";
+import type { CertificateManager } from "@naylence/runtime";
 
-export interface DefaultCertificateManagerConfig extends CertificateManagerConfig {
+export interface DefaultCertificateManagerConfig
+  extends CertificateManagerConfig {
   type: "DefaultCertificateManager";
   caServiceUrl?: string | null;
   ca_service_url?: string | null;
@@ -30,7 +31,7 @@ export const FACTORY_META = {
 } as const;
 
 function normalizeConfig(
-  config?: DefaultCertificateManagerConfig | Record<string, unknown> | null
+  config?: DefaultCertificateManagerConfig | Record<string, unknown> | null,
 ): DefaultCertificateManagerConfig {
   if (!config) {
     return { type: "DefaultCertificateManager" };
@@ -46,7 +47,7 @@ function normalizeConfig(
 
 function normalizeSecuritySettings(
   config: DefaultCertificateManagerConfig,
-  explicit?: SecuritySettings | null
+  explicit?: SecuritySettings | null,
 ): SecuritySettings | null {
   if (explicit) {
     return explicit;
@@ -65,7 +66,7 @@ function normalizeSecuritySettings(
 
 function normalizeSigning(
   config: DefaultCertificateManagerConfig,
-  explicit?: SigningConfig | null
+  explicit?: SigningConfig | null,
 ): SigningConfigInstance | null {
   if (explicit instanceof SigningConfigClass) {
     return explicit;
@@ -90,10 +91,11 @@ function normalizeSigning(
 function normalizeOptions(
   config: DefaultCertificateManagerConfig,
   securitySettings: SecuritySettings | null,
-  signing: SigningConfigInstance | null
+  signing: SigningConfigInstance | null,
 ): DefaultCertificateManagerOptions {
   const caServiceUrl = config.caServiceUrl ?? config.ca_service_url ?? null;
-  const cryptoProvider = config.cryptoProvider ?? config.crypto_provider ?? null;
+  const cryptoProvider =
+    config.cryptoProvider ?? config.crypto_provider ?? null;
 
   return {
     securitySettings,
@@ -115,9 +117,16 @@ export class DefaultCertificateManagerFactory extends CertificateManagerFactory<
     ..._factoryArgs: unknown[]
   ): Promise<CertificateManager> {
     const normalizedConfig = normalizeConfig(config);
-    const resolvedSecuritySettings = normalizeSecuritySettings(normalizedConfig, securitySettings ?? null);
+    const resolvedSecuritySettings = normalizeSecuritySettings(
+      normalizedConfig,
+      securitySettings ?? null,
+    );
     const resolvedSigning = normalizeSigning(normalizedConfig, signing ?? null);
-    const options = normalizeOptions(normalizedConfig, resolvedSecuritySettings, resolvedSigning);
+    const options = normalizeOptions(
+      normalizedConfig,
+      resolvedSecuritySettings,
+      resolvedSigning,
+    );
 
     return new DefaultCertificateManager(options);
   }

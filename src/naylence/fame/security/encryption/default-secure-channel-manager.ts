@@ -7,17 +7,16 @@ import type {
   SecureAcceptFrame,
   SecureCloseFrame,
   SecureOpenFrame,
-} from "naylence-core";
-import {
-    requireCryptoSupport,
-    getLogger,
-} from "naylence-runtime";
+} from "@naylence/core";
+import { requireCryptoSupport, getLogger } from "@naylence/runtime";
 import type {
-    SecureChannelManager,
-    SecureChannelState,
-} from "naylence-runtime";
+  SecureChannelManager,
+  SecureChannelState,
+} from "@naylence/runtime";
 
-const logger = getLogger("naylence.advanced.encryption.default-channel");
+const logger = getLogger(
+  "naylence.fame.security.encryption.default_secure_channel_manager",
+);
 
 const DEFAULT_ALGORITHM = "CHACHA20P1305";
 const CHANNEL_KEY_LENGTH = 32;
@@ -83,7 +82,10 @@ export class DefaultSecureChannelManager implements SecureChannelManager {
     return Object.freeze(Object.fromEntries(this.channelsMap.entries()));
   }
 
-  public generateOpenFrame(channelId: string, algorithm: string = DEFAULT_ALGORITHM): SecureOpenFrame {
+  public generateOpenFrame(
+    channelId: string,
+    algorithm: string = DEFAULT_ALGORITHM,
+  ): SecureOpenFrame {
     requireCryptoSupport();
 
     const privateKey = x25519.utils.randomSecretKey();
@@ -101,12 +103,17 @@ export class DefaultSecureChannelManager implements SecureChannelManager {
     } satisfies SecureOpenFrame;
   }
 
-  public async handleOpenFrame(frame: SecureOpenFrame): Promise<SecureAcceptFrame> {
+  public async handleOpenFrame(
+    frame: SecureOpenFrame,
+  ): Promise<SecureAcceptFrame> {
     requireCryptoSupport();
 
     const algorithm = frame.alg || DEFAULT_ALGORITHM;
     if (!this.isSupportedAlgorithm(algorithm)) {
-      logger.warning("unsupported_channel_algorithm", { cid: frame.cid, alg: algorithm });
+      logger.warning("unsupported_channel_algorithm", {
+        cid: frame.cid,
+        alg: algorithm,
+      });
       return {
         type: "SecureAccept",
         cid: frame.cid,
@@ -140,7 +147,10 @@ export class DefaultSecureChannelManager implements SecureChannelManager {
     const sharedSecret = x25519.scalarMult(myPrivateKey, peerPublicKey);
 
     const channelKey = this.deriveChannelKey(frame.cid, sharedSecret);
-  const channelState = this.createChannelState({ key: channelKey, algorithm });
+    const channelState = this.createChannelState({
+      key: channelKey,
+      algorithm,
+    });
     this.channelsMap.set(frame.cid, channelState);
 
     logger.debug("channel_established", { cid: frame.cid, algorithm });
@@ -161,7 +171,10 @@ export class DefaultSecureChannelManager implements SecureChannelManager {
     requireCryptoSupport();
 
     if (frame.ok === false) {
-      logger.warning("channel_rejected", { cid: frame.cid, error: frame.reason });
+      logger.warning("channel_rejected", {
+        cid: frame.cid,
+        error: frame.reason,
+      });
       this.cleanupEphemeralKey(frame.cid);
       return false;
     }
@@ -187,7 +200,10 @@ export class DefaultSecureChannelManager implements SecureChannelManager {
     const sharedSecret = x25519.scalarMult(privateKey, peerPublicKey);
     const algorithm = frame.alg || DEFAULT_ALGORITHM;
     const channelKey = this.deriveChannelKey(frame.cid, sharedSecret);
-  const channelState = this.createChannelState({ key: channelKey, algorithm });
+    const channelState = this.createChannelState({
+      key: channelKey,
+      algorithm,
+    });
     this.channelsMap.set(frame.cid, channelState);
 
     logger.debug("channel_completed", { cid: frame.cid, algorithm });
@@ -233,7 +249,10 @@ export class DefaultSecureChannelManager implements SecureChannelManager {
     };
   }
 
-  public closeChannel(channelId: string, reason: string = "User requested"): SecureCloseFrame {
+  public closeChannel(
+    channelId: string,
+    reason: string = "User requested",
+  ): SecureCloseFrame {
     if (this.channelsMap.delete(channelId)) {
       logger.debug("channel_closed_by_user", { cid: channelId, reason });
     }
@@ -275,16 +294,55 @@ export class DefaultSecureChannelManager implements SecureChannelManager {
     return removed;
   }
 
+  /**
+   * Remove all channels for a given destination by matching channel ID prefix.
+   * Channel IDs typically follow the pattern: auto-<destination>-<random>
+   * This is used to cleanup stale channels when a route is removed/rebound.
+   * @param destination The destination address (e.g., "math@fame.fabric")
+   * @returns Number of channels removed
+   */
+  public removeChannelsForDestination(destination: string): number {
+    const prefix = `auto-${destination}-`;
+    let removed = 0;
+
+    for (const channelId of this.channelsMap.keys()) {
+      if (channelId.startsWith(prefix)) {
+        if (this.removeChannel(channelId)) {
+          removed += 1;
+          logger.debug("removed_channel_for_destination", {
+            channel_id: channelId,
+            destination,
+          });
+        }
+      }
+    }
+
+    if (removed > 0) {
+      logger.info("cleanup_channels_for_destination", {
+        destination,
+        channels_removed: removed,
+      });
+    }
+
+    return removed;
+  }
+
   private isSupportedAlgorithm(algorithm: string): boolean {
     return algorithm === DEFAULT_ALGORITHM;
   }
 
-  private deriveChannelKey(channelId: string, sharedSecret: Uint8Array): Uint8Array {
+  private deriveChannelKey(
+    channelId: string,
+    sharedSecret: Uint8Array,
+  ): Uint8Array {
     const info = utf8ToBytes(`fame-channel:${channelId}`);
     return hkdf(sha256, sharedSecret, undefined, info, CHANNEL_KEY_LENGTH);
   }
 
-  private createChannelState({ key, algorithm }: ChannelStateOptions): SecureChannelState {
+  private createChannelState({
+    key,
+    algorithm,
+  }: ChannelStateOptions): SecureChannelState {
     return {
       key,
       sendCounter: 0,

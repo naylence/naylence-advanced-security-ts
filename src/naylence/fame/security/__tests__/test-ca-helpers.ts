@@ -62,4 +62,3 @@ export async function setupTestCACredentials(): Promise<TestCACredentials> {
     cleanup,
   };
 }
-

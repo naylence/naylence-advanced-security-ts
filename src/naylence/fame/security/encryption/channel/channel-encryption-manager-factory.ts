@@ -3,19 +3,25 @@ import {
   EncryptionManagerFactory,
   type EncryptionManagerConfig,
   type EncryptionFactoryDependencies,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 import {
   type EncryptionManager,
   type EncryptionOptions,
-} from "naylence-runtime";
-import type { SecureChannelManager } from "naylence-runtime";
-import type { NodeLike } from "naylence-runtime";
-import { getLogger } from "naylence-runtime";
-import { ChannelEncryptionManager, type ChannelEncryptionManagerDependencies } from "./channel-encryption-manager.js";
+} from "@naylence/runtime";
+import type { SecureChannelManager } from "@naylence/runtime";
+import type { NodeLike } from "@naylence/runtime";
+import { getLogger } from "@naylence/runtime";
+import {
+  ChannelEncryptionManager,
+  type ChannelEncryptionManagerDependencies,
+} from "./channel-encryption-manager.js";
 
-const logger = getLogger("naylence.advanced.encryption.channel.factory");
+const logger = getLogger(
+  "naylence.fame.security.encryption.channel.channel_encryption_manager_factory",
+);
 
-export interface ChannelEncryptionManagerConfig extends EncryptionManagerConfig {
+export interface ChannelEncryptionManagerConfig
+  extends EncryptionManagerConfig {
   readonly type: "ChannelEncryptionManager";
   readonly priority: number;
   readonly supportedAlgorithms: readonly string[];
@@ -38,7 +44,8 @@ export class ChannelEncryptionManagerFactory extends EncryptionManagerFactory<Ch
 
   constructor(config?: Partial<ChannelEncryptionManagerConfig> | null) {
     super();
-    this.supportedAlgorithms = config?.supportedAlgorithms ?? DEFAULT_SUPPORTED_ALGORITHMS;
+    this.supportedAlgorithms =
+      config?.supportedAlgorithms ?? DEFAULT_SUPPORTED_ALGORITHMS;
     this.encryptionType = config?.encryptionType ?? "channel";
     this.priority = config?.priority ?? 90;
   }
@@ -57,7 +64,8 @@ export class ChannelEncryptionManagerFactory extends EncryptionManagerFactory<Ch
     }
 
     const candidate = (opts as Record<string, unknown>).encryption_type;
-    const normalized = typeof candidate === "string" ? candidate : opts.encryptionType;
+    const normalized =
+      typeof candidate === "string" ? candidate : opts.encryptionType;
     return normalized === "channel";
   }
 
@@ -65,11 +73,15 @@ export class ChannelEncryptionManagerFactory extends EncryptionManagerFactory<Ch
     _config?: ChannelEncryptionManagerConfig | Record<string, unknown> | null,
     ...factoryArgs: unknown[]
   ): Promise<EncryptionManager> {
-    const [dependencies] = factoryArgs as [EncryptionFactoryDependencies | undefined];
+    const [dependencies] = factoryArgs as [
+      EncryptionFactoryDependencies | undefined,
+    ];
     const resolvedDependencies = this.resolveDependencies(dependencies);
 
     logger.debug("creating_channel_encryption_manager", {
-      has_secure_channel_manager: Boolean(resolvedDependencies.secureChannelManager),
+      has_secure_channel_manager: Boolean(
+        resolvedDependencies.secureChannelManager,
+      ),
       has_node_like: Boolean(resolvedDependencies.nodeLike),
       has_task_spawner: Boolean(resolvedDependencies.taskSpawner),
     });
@@ -78,7 +90,7 @@ export class ChannelEncryptionManagerFactory extends EncryptionManagerFactory<Ch
   }
 
   private resolveDependencies(
-    dependencies?: EncryptionFactoryDependencies
+    dependencies?: EncryptionFactoryDependencies,
   ): ChannelEncryptionManagerDependencies {
     if (!dependencies) {
       return {};
@@ -96,14 +108,20 @@ export class ChannelEncryptionManagerFactory extends EncryptionManagerFactory<Ch
   }
 
   private resolveSecureChannelManager(
-    dependencies: EncryptionFactoryDependencies
+    dependencies: EncryptionFactoryDependencies,
   ): SecureChannelManager | null {
-    const direct = dependencies.secureChannelManager as SecureChannelManager | undefined;
-    const snake = dependencies["secure_channel_manager"] as SecureChannelManager | undefined;
+    const direct = dependencies.secureChannelManager as
+      | SecureChannelManager
+      | undefined;
+    const snake = dependencies["secure_channel_manager"] as
+      | SecureChannelManager
+      | undefined;
     return direct ?? snake ?? null;
   }
 
-  private resolveNodeLike(dependencies: EncryptionFactoryDependencies): NodeLike | null {
+  private resolveNodeLike(
+    dependencies: EncryptionFactoryDependencies,
+  ): NodeLike | null {
     const direct = dependencies.nodeLike as NodeLike | undefined;
     const camel = dependencies["node_like"] as NodeLike | undefined;
     return direct ?? camel ?? null;
@@ -111,14 +129,17 @@ export class ChannelEncryptionManagerFactory extends EncryptionManagerFactory<Ch
 
   private resolveTaskSpawner(
     dependencies: EncryptionFactoryDependencies,
-    nodeLike: NodeLike | null
+    nodeLike: NodeLike | null,
   ): ChannelEncryptionManagerDependencies["taskSpawner"] {
-    const direct = dependencies.taskSpawner as ChannelEncryptionManagerDependencies["taskSpawner"];
+    const direct =
+      dependencies.taskSpawner as ChannelEncryptionManagerDependencies["taskSpawner"];
     if (direct && typeof direct.spawn === "function") {
       return direct;
     }
 
-    const snake = dependencies["task_spawner"] as ChannelEncryptionManagerDependencies["taskSpawner"];
+    const snake = dependencies[
+      "task_spawner"
+    ] as ChannelEncryptionManagerDependencies["taskSpawner"];
     if (snake && typeof snake.spawn === "function") {
       return snake;
     }

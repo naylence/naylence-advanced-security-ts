@@ -4,8 +4,12 @@
  * Provides a unified way to create CAService implementations from configuration.
  */
 
-import type { CreateResourceOptions, ResourceConfig } from "naylence-factory";
-import { AbstractResourceFactory, createDefaultResource, createResource } from "naylence-factory";
+import type { CreateResourceOptions, ResourceConfig } from "@naylence/factory";
+import {
+  AbstractResourceFactory,
+  createDefaultResource,
+  createResource,
+} from "@naylence/factory";
 import type { CAService } from "./ca-types.js";
 
 /**
@@ -32,11 +36,15 @@ export abstract class CAServiceFactory<
    */
   static async createCAService(
     config?: CAServiceConfig | Record<string, unknown>,
-    options?: CreateResourceOptions
+    options?: CreateResourceOptions,
   ): Promise<CAService> {
     if (!config) {
       // Use default CA service
-      const service = await createDefaultResource("CAServiceFactory", config, options);
+      const service = await createDefaultResource(
+        "CAServiceFactory",
+        config,
+        options,
+      );
       if (!service) {
         throw new Error("No default CA service factory registered");
       }
@@ -45,7 +53,11 @@ export abstract class CAServiceFactory<
 
     if (typeof config === "object" && !("type" in config)) {
       // No type specified, use default
-      const service = await createDefaultResource("CAServiceFactory", config, options);
+      const service = await createDefaultResource(
+        "CAServiceFactory",
+        config,
+        options,
+      );
       if (!service) {
         throw new Error("No default CA service factory registered");
       }
@@ -58,9 +70,15 @@ export abstract class CAServiceFactory<
         ? (config as CAServiceConfig)
         : ({ type: "CAService", ...config } as CAServiceConfig);
 
-    const service = await createResource("CAServiceFactory", configObj, options);
+    const service = await createResource(
+      "CAServiceFactory",
+      configObj,
+      options,
+    );
     if (!service) {
-      throw new Error(`Failed to create CA service of type "${configObj.type}"`);
+      throw new Error(
+        `Failed to create CA service of type "${configObj.type}"`,
+      );
     }
     return service as CAService;
   }
@@ -78,5 +96,6 @@ export const FACTORY_META = {
   factoryId: "CAServiceFactory",
   factoryType: CAServiceFactory,
   resourceType: "CAService",
-  description: "Factory for creating Certificate Authority (CA) service instances",
+  description:
+    "Factory for creating Certificate Authority (CA) service instances",
 };

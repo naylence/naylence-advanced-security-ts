@@ -4,8 +4,8 @@
  * Provides the default CA service implementation with environment variable support.
  */
 
-import type { ResourceConfig } from "naylence-factory";
-import { AbstractResourceFactory } from "naylence-factory";
+import type { ResourceConfig } from "@naylence/factory";
+import { AbstractResourceFactory } from "@naylence/factory";
 import type { Authorizer } from "./ca-types.js";
 import type { CAService } from "./ca-types.js";
 import { DefaultCAService } from "./default-ca-service.js";
@@ -52,7 +52,7 @@ export const FACTORY_META = {
  * Normalize configuration from snake_case or camelCase to standard format.
  */
 function normalizeConfig(
-  config?: DefaultCAServiceConfig | Record<string, unknown> | null
+  config?: DefaultCAServiceConfig | Record<string, unknown> | null,
 ): DefaultCAServiceConfig {
   if (!config) {
     return { type: "DefaultCAService" };
@@ -89,12 +89,16 @@ export class DefaultCAServiceFactory extends AbstractResourceFactory<
     const normalizedConfig = normalizeConfig(config);
 
     // Extract configuration with snake_case fallbacks
-    const caCertPem = normalizedConfig.caCertPem ?? normalizedConfig.ca_cert_pem;
+    const caCertPem =
+      normalizedConfig.caCertPem ?? normalizedConfig.ca_cert_pem;
     const caKeyPem = normalizedConfig.caKeyPem ?? normalizedConfig.ca_key_pem;
     const intermediateChainPem =
-      normalizedConfig.intermediateChainPem ?? normalizedConfig.intermediate_chain_pem;
-    const signingCertPem = normalizedConfig.signingCertPem ?? normalizedConfig.signing_cert_pem;
-    const signingKeyPem = normalizedConfig.signingKeyPem ?? normalizedConfig.signing_key_pem;
+      normalizedConfig.intermediateChainPem ??
+      normalizedConfig.intermediate_chain_pem;
+    const signingCertPem =
+      normalizedConfig.signingCertPem ?? normalizedConfig.signing_cert_pem;
+    const signingKeyPem =
+      normalizedConfig.signingKeyPem ?? normalizedConfig.signing_key_pem;
 
     // TODO: Create authorizer from config when AuthorizerFactory is available
     const authorizer: Authorizer | undefined = undefined;

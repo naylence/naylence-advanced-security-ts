@@ -6,7 +6,7 @@ import {
   KeyManagerFactory,
   KEY_MANAGER_FACTORY_BASE_TYPE,
   type KeyManagerConfig,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 
 import { X5CKeyManager, type X5CKeyManagerOptions } from "./x5c-key-manager.js";
 
@@ -28,7 +28,7 @@ export class X5CKeyManagerFactory extends KeyManagerFactory<X5CKeyManagerConfig>
 
   public async create(
     config?: X5CKeyManagerConfig | Record<string, unknown> | null,
-    keyStore?: KeyStore | null
+    keyStore?: KeyStore | null,
   ): Promise<X5CKeyManager> {
     const resolvedConfig: X5CKeyManagerConfig = {
       type: "X5CKeyManager",
@@ -38,7 +38,9 @@ export class X5CKeyManagerFactory extends KeyManagerFactory<X5CKeyManagerConfig>
     let resolvedKeyStore: KeyStore | null = keyStore ?? null;
 
     if (!resolvedKeyStore && resolvedConfig.keyStore) {
-      resolvedKeyStore = await KeyStoreFactory.createKeyStore(resolvedConfig.keyStore);
+      resolvedKeyStore = await KeyStoreFactory.createKeyStore(
+        resolvedConfig.keyStore,
+      );
     }
 
     if (!resolvedKeyStore) {

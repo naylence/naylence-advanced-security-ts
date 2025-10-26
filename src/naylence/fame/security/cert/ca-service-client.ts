@@ -58,7 +58,9 @@ export function extractCertificateInfo(_certPem: string): CertificateInfo {
       issuer: "TODO: Parse certificate",
       serialNumber: "TODO",
       validFrom: new Date().toISOString(),
-      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      validUntil: new Date(
+        Date.now() + 365 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
       status: "unknown",
     };
   } catch (error) {
@@ -81,7 +83,10 @@ export function extractCertificateInfo(_certPem: string): CertificateInfo {
  * @param certType - Type description for logging (e.g., "Certificate", "CA Certificate")
  * @returns Formatted string with certificate details
  */
-export function formatCertificateInfo(certPem: string, certType: string = "Certificate"): string {
+export function formatCertificateInfo(
+  certPem: string,
+  certType: string = "Certificate",
+): string {
   const info = extractCertificateInfo(certPem);
 
   if (info.error) {
@@ -98,7 +103,9 @@ export function formatCertificateInfo(certPem: string, certType: string = "Certi
   ];
 
   if (info.subjectAlternativeNames && info.subjectAlternativeNames.length > 0) {
-    lines.push(`Subject Alternative Names: ${info.subjectAlternativeNames.join(", ")}`);
+    lines.push(
+      `Subject Alternative Names: ${info.subjectAlternativeNames.join(", ")}`,
+    );
   }
 
   if (info.spiffeId) {
@@ -124,7 +131,7 @@ export function formatCertificateInfo(certPem: string, certType: string = "Certi
     } else if (info.hoursRemaining !== undefined && info.hoursRemaining > 0) {
       if (info.minutesRemaining !== undefined && info.minutesRemaining > 0) {
         lines.push(
-          `Status: Valid (${info.hoursRemaining} hours, ${info.minutesRemaining} minutes remaining)`
+          `Status: Valid (${info.hoursRemaining} hours, ${info.minutesRemaining} minutes remaining)`,
         );
       } else {
         lines.push(`Status: Valid (${info.hoursRemaining} hours remaining)`);
@@ -155,7 +162,10 @@ export class CAServiceClient {
    * @param connectionGrant - HTTP connection grant with CA service URL
    * @param timeoutSeconds - Request timeout in seconds (default: 30)
    */
-  constructor(connectionGrant: HttpConnectionGrant, timeoutSeconds: number = 30.0) {
+  constructor(
+    connectionGrant: HttpConnectionGrant,
+    timeoutSeconds: number = 30.0,
+  ) {
     if (!connectionGrant || typeof connectionGrant.url !== "string") {
       throw new Error("connectionGrant must have a valid url property");
     }
@@ -187,7 +197,7 @@ export class CAServiceClient {
     csrPem: string,
     requesterId: string,
     physicalPath?: string,
-    logicals?: string[]
+    logicals?: string[],
   ): Promise<[string, string]> {
     const requestData = {
       csr_pem: csrPem,
@@ -217,7 +227,10 @@ export class CAServiceClient {
     try {
       // Create abort controller for timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeoutSeconds * 1000);
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        this.timeoutSeconds * 1000,
+      );
 
       try {
         const response = await fetch(url, {
@@ -232,7 +245,8 @@ export class CAServiceClient {
         if (response.ok) {
           const result = await response.json();
           const certificatePem: string = result.certificate_pem;
-          const certificateChainPem: string = result.certificate_chain_pem || certificatePem;
+          const certificateChainPem: string =
+            result.certificate_chain_pem || certificatePem;
 
           logger.debug("certificate_request_successful", {
             requester_id: requesterId,
@@ -250,7 +264,9 @@ export class CAServiceClient {
           // If we have a separate certificate chain, also log its details
           if (certificateChainPem !== certificatePem) {
             // Extract individual certificates from the chain
-            const chainCerts = certificateChainPem.split("-----END CERTIFICATE-----\n").slice(0, -1);
+            const chainCerts = certificateChainPem
+              .split("-----END CERTIFICATE-----\n")
+              .slice(0, -1);
 
             for (let i = 0; i < chainCerts.length; i++) {
               const certBlock = chainCerts[i];
@@ -286,10 +302,16 @@ export class CAServiceClient {
         } else {
           let errorDetail = "Unknown error";
           try {
-            const errorData = await response.json();
-            errorDetail = errorData.detail || errorDetail;
+            const bodyText = await response.text();
+            try {
+              const errorData = JSON.parse(bodyText);
+              errorDetail = errorData.detail || bodyText;
+            } catch {
+              errorDetail = bodyText;
+            }
           } catch {
-            errorDetail = await response.text();
+            // Body read failed entirely
+            errorDetail = `HTTP ${response.status}`;
           }
 
           logger.error("certificate_request_failed", {
@@ -299,7 +321,7 @@ export class CAServiceClient {
           });
 
           throw new CertificateRequestError(
-            `Certificate request failed (HTTP ${response.status}): ${errorDetail}`
+            `Certificate request failed (HTTP ${response.status}): ${errorDetail}`,
           );
         }
       } finally {
@@ -316,7 +338,7 @@ export class CAServiceClient {
           timeout_seconds: this.timeoutSeconds,
         });
         throw new CertificateRequestError(
-          `Certificate request timed out after ${this.timeoutSeconds} seconds`
+          `Certificate request timed out after ${this.timeoutSeconds} seconds`,
         );
       }
 
@@ -324,7 +346,9 @@ export class CAServiceClient {
         requester_id: requesterId,
         error: String(error),
       });
-      throw new CertificateRequestError(`Network error requesting certificate: ${error}`);
+      throw new CertificateRequestError(
+        `Network error requesting certificate: ${error}`,
+      );
     }
   }
 }

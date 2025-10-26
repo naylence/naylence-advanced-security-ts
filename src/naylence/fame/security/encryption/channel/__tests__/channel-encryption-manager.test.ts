@@ -1,9 +1,9 @@
-import { createFameEnvelope, FameAddress, formatAddress } from "naylence-core";
+import { createFameEnvelope, FameAddress, formatAddress } from "@naylence/core";
 import type {
   DataFrame,
   DeliveryAckFrame,
   SecureOpenFrame,
-} from "naylence-core";
+} from "@naylence/core";
 import { ChannelEncryptionManager } from "../channel-encryption-manager.js";
 
 type TestSecureChannelState = {
@@ -27,17 +27,19 @@ function createSecureChannelState(): TestSecureChannelState {
 }
 
 function createSecureChannelManager(
-  channels: Record<string, TestSecureChannelState>
+  channels: Record<string, TestSecureChannelState>,
 ): any {
   return {
     channels,
-    generateOpenFrame: jest.fn((channelId: string): SecureOpenFrame => ({
-      type: "SecureOpen",
-      cid: channelId,
-      ephPub: "AAA=".repeat(8).slice(0, 44),
-      alg: "CHACHA20P1305",
-      opts: 0,
-    })),
+    generateOpenFrame: jest.fn(
+      (channelId: string): SecureOpenFrame => ({
+        type: "SecureOpen",
+        cid: channelId,
+        ephPub: "AAA=".repeat(8).slice(0, 44),
+        alg: "CHACHA20P1305",
+        opts: 0,
+      }),
+    ),
     handleOpenFrame: jest.fn(),
     handleAcceptFrame: jest.fn(),
     handleCloseFrame: jest.fn(),
@@ -167,7 +169,8 @@ describe("ChannelEncryptionManager", () => {
 
     await flushTasks();
 
-    const openFrameCall = (secureChannelManager.generateOpenFrame as jest.Mock).mock.calls[0];
+    const openFrameCall = (secureChannelManager.generateOpenFrame as jest.Mock)
+      .mock.calls[0];
     const channelId: string = openFrameCall[0];
     expect(channelId.startsWith(`auto-${destination}-`)).toBe(true);
 

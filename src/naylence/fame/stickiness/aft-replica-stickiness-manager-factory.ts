@@ -1,15 +1,16 @@
-import type { ReplicaStickinessManager } from "naylence-runtime";
+import type { ReplicaStickinessManager } from "@naylence/runtime";
 import {
   REPLICA_STICKINESS_MANAGER_FACTORY_BASE_TYPE,
   ReplicaStickinessManagerFactory,
   type ReplicaStickinessManagerConfig,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 
 import type { AFTHelper } from "./aft-helper.js";
 import { AFTReplicaStickinessManager } from "./aft-replica-stickiness-manager.js";
 import { StickinessMode, normalizeStickinessMode } from "./stickiness-mode.js";
 
-export interface AFTReplicaStickinessManagerConfig extends ReplicaStickinessManagerConfig {
+export interface AFTReplicaStickinessManagerConfig
+  extends ReplicaStickinessManagerConfig {
   type: "AFTReplicaStickinessManager";
   securityLevel?: StickinessMode | string;
   maxTtlSec?: number;
@@ -30,7 +31,7 @@ const DEFAULT_VALUES = {
 } as const;
 
 function normalizeConfig(
-  config?: AFTReplicaStickinessManagerConfig | Record<string, unknown> | null
+  config?: AFTReplicaStickinessManagerConfig | Record<string, unknown> | null,
 ): AFTReplicaStickinessManagerConfig {
   const record = (config ?? {}) as Record<string, unknown>;
 
@@ -58,15 +59,17 @@ export class AFTReplicaStickinessManagerFactory extends ReplicaStickinessManager
 
   public async create(
     config?: AFTReplicaStickinessManagerConfig | Record<string, unknown> | null,
-    dependencies?: AFTReplicaStickinessManagerDependencies | null
+    dependencies?: AFTReplicaStickinessManagerDependencies | null,
   ): Promise<ReplicaStickinessManager> {
     const resolvedConfig = normalizeConfig(config);
     const helper = dependencies?.aftHelper ?? null;
     const securityLevel =
-      normalizeStickinessMode(resolvedConfig.securityLevel ?? DEFAULT_VALUES.securityLevel) ??
-      DEFAULT_VALUES.securityLevel;
+      normalizeStickinessMode(
+        resolvedConfig.securityLevel ?? DEFAULT_VALUES.securityLevel,
+      ) ?? DEFAULT_VALUES.securityLevel;
     const maxTtlSec =
-      typeof resolvedConfig.maxTtlSec === "number" && Number.isFinite(resolvedConfig.maxTtlSec)
+      typeof resolvedConfig.maxTtlSec === "number" &&
+      Number.isFinite(resolvedConfig.maxTtlSec)
         ? Math.max(0, Math.floor(resolvedConfig.maxTtlSec))
         : DEFAULT_VALUES.maxTtlSec;
 

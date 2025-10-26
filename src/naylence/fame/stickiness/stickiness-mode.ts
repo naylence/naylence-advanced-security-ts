@@ -4,7 +4,9 @@ export enum StickinessMode {
   SID_ONLY = "sid-only",
 }
 
-export function normalizeStickinessMode(value: string | StickinessMode): StickinessMode {
+export function normalizeStickinessMode(
+  value: string | StickinessMode,
+): StickinessMode {
   switch (value) {
     case StickinessMode.STRICT:
     case "strict":

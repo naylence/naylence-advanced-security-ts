@@ -2,11 +2,12 @@ import {
   SECURE_CHANNEL_MANAGER_FACTORY_BASE_TYPE,
   SecureChannelManagerFactory,
   type SecureChannelManagerConfig,
-} from "naylence-runtime";
-import type { SecureChannelManager } from "naylence-runtime";
+} from "@naylence/runtime";
+import type { SecureChannelManager } from "@naylence/runtime";
 import { DefaultSecureChannelManager } from "./default-secure-channel-manager.js";
 
-export interface DefaultSecureChannelManagerConfig extends SecureChannelManagerConfig {
+export interface DefaultSecureChannelManagerConfig
+  extends SecureChannelManagerConfig {
   readonly type: "DefaultSecureChannelManager";
   readonly channelTtlSeconds?: number;
   readonly channelTtl?: number;
@@ -24,10 +25,15 @@ export class DefaultSecureChannelManagerFactory extends SecureChannelManagerFact
   public readonly priority = 500;
 
   public async create(
-    config: DefaultSecureChannelManagerConfig | Record<string, unknown> | null = null
+    config:
+      | DefaultSecureChannelManagerConfig
+      | Record<string, unknown>
+      | null = null,
   ): Promise<SecureChannelManager> {
     const ttl = this.resolveChannelTtl(config);
-    return new DefaultSecureChannelManager(ttl ? { channelTtlSeconds: ttl } : {});
+    return new DefaultSecureChannelManager(
+      ttl ? { channelTtlSeconds: ttl } : {},
+    );
   }
 
   public getSupportedAlgorithms(): readonly string[] {
@@ -35,7 +41,7 @@ export class DefaultSecureChannelManagerFactory extends SecureChannelManagerFact
   }
 
   private resolveChannelTtl(
-    config: DefaultSecureChannelManagerConfig | Record<string, unknown> | null
+    config: DefaultSecureChannelManagerConfig | Record<string, unknown> | null,
   ): number | undefined {
     if (!config) {
       return undefined;

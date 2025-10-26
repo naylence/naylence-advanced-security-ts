@@ -4,7 +4,7 @@ import type {
   NodePlacementConfig,
   TransportProvisionerConfig,
   DefaultWelcomeServiceConfig,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 import {
   AuthorizerFactory,
   TokenIssuerFactory,
@@ -13,9 +13,12 @@ import {
   WelcomeServiceFactory,
   WELCOME_SERVICE_FACTORY_BASE_TYPE,
   type WelcomeService,
-} from "naylence-runtime";
+} from "@naylence/runtime";
 
-import { AdvancedWelcomeService, type AdvancedWelcomeServiceOptions } from "./advanced-welcome-service.js";
+import {
+  AdvancedWelcomeService,
+  type AdvancedWelcomeServiceOptions,
+} from "./advanced-welcome-service.js";
 
 export interface AdvancedWelcomeServiceConfig
   extends Omit<DefaultWelcomeServiceConfig, "type"> {
@@ -51,26 +54,32 @@ export class AdvancedWelcomeServiceFactory extends WelcomeServiceFactory<Advance
   ): Promise<WelcomeService> {
     const normalized = normalizeConfig(config);
 
-    const placementStrategy = await NodePlacementStrategyFactory.createNodePlacementStrategy(
-      normalized.placementConfig ?? null,
-      factoryArgs.length > 0 ? { factoryArgs } : undefined
-    );
+    // Crypto provider should be passed from upstream (node-welcome-server)
+    // Do not create it here - downstream components should use what's passed in factoryArgs
 
-    const transportProvisioner = await TransportProvisionerFactory.createTransportProvisioner(
-      normalized.transportConfig ?? null,
-      factoryArgs.length > 0 ? { factoryArgs } : undefined
-    );
+    const placementStrategy =
+      await NodePlacementStrategyFactory.createNodePlacementStrategy(
+        normalized.placementConfig ?? null,
+        factoryArgs.length > 0 ? { factoryArgs } : undefined,
+      );
+
+    const transportProvisioner =
+      await TransportProvisionerFactory.createTransportProvisioner(
+        normalized.transportConfig ?? null,
+        factoryArgs.length > 0 ? { factoryArgs } : undefined,
+      );
 
     const tokenIssuer = await TokenIssuerFactory.createTokenIssuer(
       normalized.tokenIssuerConfig ?? null,
-      factoryArgs.length > 0 ? { factoryArgs } : undefined
+      factoryArgs.length > 0 ? { factoryArgs } : undefined,
     );
 
     let authorizer = null;
     if (normalized.authorizerConfig) {
       authorizer =
-        (await AuthorizerFactory.createAuthorizer(normalized.authorizerConfig, { factoryArgs })) ??
-        null;
+        (await AuthorizerFactory.createAuthorizer(normalized.authorizerConfig, {
+          factoryArgs,
+        })) ?? null;
     }
 
     const options: AdvancedWelcomeServiceOptions = {
@@ -90,13 +99,14 @@ export class AdvancedWelcomeServiceFactory extends WelcomeServiceFactory<Advance
 }
 
 function normalizeConfig(
-  config?: AdvancedWelcomeServiceConfig | Record<string, unknown> | null
+  config?: AdvancedWelcomeServiceConfig | Record<string, unknown> | null,
 ): NormalizedAdvancedWelcomeConfig {
   if (!config) {
     throw new Error("AdvancedWelcomeService requires configuration");
   }
 
-  const source = config as AdvancedWelcomeServiceConfig & Record<string, unknown>;
+  const source = config as AdvancedWelcomeServiceConfig &
+    Record<string, unknown>;
 
   const ttlCandidate =
     typeof source.ttlSec === "number"
@@ -106,14 +116,18 @@ function normalizeConfig(
         : undefined;
 
   const caServiceUrlCandidate =
-    typeof source.caServiceUrl === "string" && source.caServiceUrl.trim().length > 0
+    typeof source.caServiceUrl === "string" &&
+    source.caServiceUrl.trim().length > 0
       ? source.caServiceUrl.trim()
-      : typeof source.ca_service_url === "string" && source.ca_service_url.trim().length > 0
+      : typeof source.ca_service_url === "string" &&
+          source.ca_service_url.trim().length > 0
         ? source.ca_service_url.trim()
         : undefined;
 
   if (!caServiceUrlCandidate) {
-    throw new Error("AdvancedWelcomeService configuration requires caServiceUrl");
+    throw new Error(
+      "AdvancedWelcomeService configuration requires caServiceUrl",
+    );
   }
 
   const normalized: NormalizedAdvancedWelcomeConfig = {
@@ -122,12 +136,18 @@ function normalizeConfig(
 
   if (source.placement !== undefined) {
     normalized.placementConfig =
-      (source.placement as NodePlacementConfig | Record<string, unknown> | null) ?? null;
+      (source.placement as
+        | NodePlacementConfig
+        | Record<string, unknown>
+        | null) ?? null;
   }
 
   if (source.transport !== undefined) {
     normalized.transportConfig =
-      (source.transport as TransportProvisionerConfig | Record<string, unknown> | null) ?? null;
+      (source.transport as
+        | TransportProvisionerConfig
+        | Record<string, unknown>
+        | null) ?? null;
   }
 
   const tokenIssuerConfig =
@@ -139,12 +159,18 @@ function normalizeConfig(
 
   if (tokenIssuerConfig !== undefined) {
     normalized.tokenIssuerConfig =
-      (tokenIssuerConfig as TokenIssuerConfig | Record<string, unknown> | null) ?? null;
+      (tokenIssuerConfig as
+        | TokenIssuerConfig
+        | Record<string, unknown>
+        | null) ?? null;
   }
 
   if (source.authorizer !== undefined) {
     normalized.authorizerConfig =
-      (source.authorizer as AuthorizerConfig | Record<string, unknown> | null) ?? null;
+      (source.authorizer as
+        | AuthorizerConfig
+        | Record<string, unknown>
+        | null) ?? null;
   }
 
   if (ttlCandidate !== undefined && Number.isFinite(ttlCandidate)) {

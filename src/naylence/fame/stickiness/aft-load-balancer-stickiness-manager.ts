@@ -1,16 +1,22 @@
-import type { FameDeliveryContext, FameEnvelope, Stickiness } from "naylence-core";
-import { DeliveryOriginType } from "naylence-core";
-import { BaseNodeEventListener } from "naylence-runtime";
-import type { NodeLike } from "naylence-runtime";
-import { getLogger } from "naylence-runtime";
+import type {
+  FameDeliveryContext,
+  FameEnvelope,
+  Stickiness,
+} from "@naylence/core";
+import { DeliveryOriginType } from "@naylence/core";
+import { BaseNodeEventListener } from "@naylence/runtime";
+import type { NodeLike } from "@naylence/runtime";
+import { getLogger } from "@naylence/runtime";
 
-import type { LoadBalancerStickinessManager } from "naylence-runtime";
+import type { LoadBalancerStickinessManager } from "@naylence/runtime";
 
 import type { AFTLoadBalancerStickinessManagerConfig } from "./aft-load-balancer-stickiness-manager-factory.js";
 import type { AFTVerifier } from "./aft-verifier.js";
 import { StickinessMode } from "./stickiness-mode.js";
 
-const logger = getLogger("naylence.advanced.stickiness.aft-load-balancer");
+const logger = getLogger(
+  "naylence.fame.stickiness.aft_load_balancer_stickiness_manager",
+);
 
 type Metrics = {
   cacheHits: number;
@@ -19,7 +25,6 @@ type Metrics = {
   associationsCreated: number;
   associationsExpired: number;
 };
-
 
 class AFTAssociation {
   public readonly replicaId: string;
@@ -51,7 +56,9 @@ class AFTAssociation {
     this.createdAt = params.createdAt ?? Math.floor(Date.now() / 1000);
   }
 
-  public isExpired(referenceTime: number = Math.floor(Date.now() / 1000)): boolean {
+  public isExpired(
+    referenceTime: number = Math.floor(Date.now() / 1000),
+  ): boolean {
     return referenceTime >= this.exp;
   }
 
@@ -85,7 +92,10 @@ export class AFTLoadBalancerStickinessManager
     return this.config.defaultTtlSec ?? 30;
   }
 
-  public constructor(config: AFTLoadBalancerStickinessManagerConfig, verifier: AFTVerifier) {
+  public constructor(
+    config: AFTLoadBalancerStickinessManagerConfig,
+    verifier: AFTVerifier,
+  ) {
     super();
     this.config = config;
     this.verifier = verifier;
@@ -125,7 +135,10 @@ export class AFTLoadBalancerStickinessManager
     }
 
     const childModes = new Set<string>();
-    if (Array.isArray(stickiness.supportedModes) && stickiness.supportedModes.length > 0) {
+    if (
+      Array.isArray(stickiness.supportedModes) &&
+      stickiness.supportedModes.length > 0
+    ) {
       for (const mode of stickiness.supportedModes) {
         childModes.add(mode);
       }
@@ -135,7 +148,12 @@ export class AFTLoadBalancerStickinessManager
 
     if (childModes.has("aft") && this.verifier) {
       const ttl = this.defaultTtlSec;
-      const policy: Stickiness = { enabled: true, mode: "aft", ttlSec: ttl, version };
+      const policy: Stickiness = {
+        enabled: true,
+        mode: "aft",
+        ttlSec: ttl,
+        version,
+      };
       logger.debug("stickiness_negotiated", { mode: policy.mode, ttl });
       return policy;
     }
@@ -150,7 +168,10 @@ export class AFTLoadBalancerStickinessManager
     return { enabled: false, version };
   }
 
-  public async handleOutboundEnvelope(envelope: FameEnvelope, replicaId: string): Promise<string | null> {
+  public async handleOutboundEnvelope(
+    envelope: FameEnvelope,
+    replicaId: string,
+  ): Promise<string | null> {
     if (!this.config.enabled) {
       logger.debug("stickiness_disabled", { envelope_id: envelope.id });
       return null;
@@ -175,7 +196,10 @@ export class AFTLoadBalancerStickinessManager
       return null;
     }
 
-    const verification = await this.verifier.verify(aftToken, envelope.sid ?? undefined);
+    const verification = await this.verifier.verify(
+      aftToken,
+      envelope.sid ?? undefined,
+    );
 
     if (!verification.valid) {
       this.metrics.verifyFailures += 1;
@@ -191,7 +215,8 @@ export class AFTLoadBalancerStickinessManager
       replicaId,
       token: aftToken,
       sid: verification.sid ?? "",
-      exp: verification.exp ?? Math.floor(Date.now() / 1000) + this.defaultTtlSec,
+      exp:
+        verification.exp ?? Math.floor(Date.now() / 1000) + this.defaultTtlSec,
       trustLevel: verification.trustLevel,
       scope: verification.scope ?? null,
       clientSid: verification.clientSid ?? null,
@@ -222,7 +247,7 @@ export class AFTLoadBalancerStickinessManager
 
   public getStickyReplicaSegment(
     envelope: FameEnvelope,
-    segments?: readonly string[] | null
+    segments?: readonly string[] | null,
   ): string | null {
     if (!this.config.enabled) {
       logger.debug("stickiness_disabled", { envelope_id: envelope.id });
@@ -257,7 +282,10 @@ export class AFTLoadBalancerStickinessManager
         }
 
         for (const [token, association] of this.aftAssociations.entries()) {
-          if (association.replicaId === cachedReplica && !association.isExpired()) {
+          if (
+            association.replicaId === cachedReplica &&
+            !association.isExpired()
+          ) {
             envelope.aft = token;
             this.metrics.cacheHits += 1;
             logger.debug("sid_cache_routed_envelope", {
@@ -324,7 +352,9 @@ export class AFTLoadBalancerStickinessManager
 
     if (expiredTokens.length > 0) {
       this.metrics.associationsExpired += expiredTokens.length;
-      logger.debug("cleaned_expired_associations", { count: expiredTokens.length });
+      logger.debug("cleaned_expired_associations", {
+        count: expiredTokens.length,
+      });
     }
   }
 
@@ -405,7 +435,7 @@ export class AFTLoadBalancerStickinessManager
   public async onDeliver(
     _node: NodeLike,
     envelope: FameEnvelope,
-    context?: FameDeliveryContext
+    context?: FameDeliveryContext,
   ): Promise<FameEnvelope | null> {
     logger.debug("stickiness_manager_on_deliver", {
       envelope_id: envelope.id,
@@ -451,10 +481,14 @@ export class AFTLoadBalancerStickinessManager
           });
         }
       } else {
-        logger.debug("downstream_envelope_without_source_route", { envelope_id: envelope.id });
+        logger.debug("downstream_envelope_without_source_route", {
+          envelope_id: envelope.id,
+        });
       }
     } else {
-      logger.debug("envelope_not_from_downstream", { envelope_id: envelope.id });
+      logger.debug("envelope_not_from_downstream", {
+        envelope_id: envelope.id,
+      });
     }
 
     return envelope;
@@ -470,7 +504,7 @@ export class AFTLoadBalancerStickinessManager
       trustLevel: string;
       scope?: string | null;
       clientSid?: string | null;
-    }
+    },
   ): void {
     if (this.aftAssociations.has(token)) {
       this.aftAssociations.delete(token);

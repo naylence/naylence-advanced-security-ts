@@ -1,10 +1,10 @@
-import { ExtensionManager } from "naylence-factory";
+import { ExtensionManager } from "@naylence/factory";
 import {
   ENCRYPTION_MANAGER_FACTORY_BASE_TYPE,
   type EncryptionManagerFactory,
-} from "naylence-runtime";
-import type { EncryptionOptions } from "naylence-runtime";
-import { getLogger } from "naylence-runtime";
+} from "@naylence/runtime";
+import type { EncryptionOptions } from "@naylence/runtime";
+import { getLogger } from "@naylence/runtime";
 
 type EncryptionFactoryInfo = {
   readonly totalFactories: number;
@@ -13,14 +13,23 @@ type EncryptionFactoryInfo = {
   readonly typeMappings: Record<string, string[]>;
 };
 
-const logger = getLogger("naylence.advanced.encryption.registry");
+const logger = getLogger(
+  "naylence.fame.security.encryption.encryption_manager_registry",
+);
 
 export class EncryptionManagerFactoryRegistry {
   private readonly factories: EncryptionManagerFactory[] = [];
-  private readonly algorithmToFactory = new Map<string, EncryptionManagerFactory>();
-  private readonly typeToFactories = new Map<string, EncryptionManagerFactory[]>();
+  private readonly algorithmToFactory = new Map<
+    string,
+    EncryptionManagerFactory
+  >();
+  private readonly typeToFactories = new Map<
+    string,
+    EncryptionManagerFactory[]
+  >();
   private readonly factorySet = new Set<EncryptionManagerFactory>();
-  private readonly autoDiscoveredFactories = new Set<EncryptionManagerFactory>();
+  private readonly autoDiscoveredFactories =
+    new Set<EncryptionManagerFactory>();
   private autoDiscovered = false;
 
   constructor(autoDiscover: boolean = true) {
@@ -35,14 +44,19 @@ export class EncryptionManagerFactoryRegistry {
     }
 
     try {
-      const extensionInfos = ExtensionManager.getExtensionsByType(ENCRYPTION_MANAGER_FACTORY_BASE_TYPE);
+      const extensionInfos = ExtensionManager.getExtensionsByType(
+        ENCRYPTION_MANAGER_FACTORY_BASE_TYPE,
+      );
 
       let registeredCount = 0;
       for (const [factoryName, info] of extensionInfos) {
         if (factoryName === "CompositeEncryptionManager") {
-          logger.debug("skipping_composite_factory_to_avoid_circular_dependency", {
-            factory_name: factoryName,
-          });
+          logger.debug(
+            "skipping_composite_factory_to_avoid_circular_dependency",
+            {
+              factory_name: factoryName,
+            },
+          );
           continue;
         }
 
@@ -50,7 +64,7 @@ export class EncryptionManagerFactoryRegistry {
           const factoryInstance = (info.instance ??
             ExtensionManager.getGlobalFactory(
               ENCRYPTION_MANAGER_FACTORY_BASE_TYPE,
-              factoryName
+              factoryName,
             )) as EncryptionManagerFactory;
 
           this.registerFactory(factoryInstance, { autoDiscovered: true });
@@ -86,7 +100,7 @@ export class EncryptionManagerFactoryRegistry {
 
   public registerFactory(
     factory: EncryptionManagerFactory,
-    options: { autoDiscovered?: boolean } = {}
+    options: { autoDiscovered?: boolean } = {},
   ): void {
     if (this.factorySet.has(factory)) {
       return;
@@ -125,12 +139,16 @@ export class EncryptionManagerFactoryRegistry {
     });
   }
 
-  public getFactoryForAlgorithm(algorithm: string): EncryptionManagerFactory | undefined {
+  public getFactoryForAlgorithm(
+    algorithm: string,
+  ): EncryptionManagerFactory | undefined {
     this.ensureAutoDiscovery();
     return this.algorithmToFactory.get(algorithm);
   }
 
-  public getFactoryForOptions(opts?: EncryptionOptions | null): EncryptionManagerFactory | undefined {
+  public getFactoryForOptions(
+    opts?: EncryptionOptions | null,
+  ): EncryptionManagerFactory | undefined {
     this.ensureAutoDiscovery();
     for (const factory of this.factories) {
       if (factory.supportsOptions(opts ?? undefined)) {
@@ -146,7 +164,9 @@ export class EncryptionManagerFactoryRegistry {
     return undefined;
   }
 
-  public getFactoriesByType(encryptionType: string): readonly EncryptionManagerFactory[] {
+  public getFactoriesByType(
+    encryptionType: string,
+  ): readonly EncryptionManagerFactory[] {
     this.ensureAutoDiscovery();
     return this.typeToFactories.get(encryptionType) ?? [];
   }
@@ -161,22 +181,25 @@ export class EncryptionManagerFactoryRegistry {
       totalFactories: this.factories.length,
       autoDiscovered: this.autoDiscovered,
       algorithmMappings: Object.fromEntries(
-        Array.from(this.algorithmToFactory.entries()).map(([algorithm, factory]) => [
-          algorithm,
-          factory.constructor.name,
-        ])
+        Array.from(this.algorithmToFactory.entries()).map(
+          ([algorithm, factory]) => [algorithm, factory.constructor.name],
+        ),
       ),
       typeMappings: Object.fromEntries(
-        Array.from(this.typeToFactories.entries()).map(([encType, factories]) => [
-          encType,
-          factories.map((factory) => factory.constructor.name),
-        ])
+        Array.from(this.typeToFactories.entries()).map(
+          ([encType, factories]) => [
+            encType,
+            factories.map((factory) => factory.constructor.name),
+          ],
+        ),
       ),
     };
   }
 
   public forceRediscovery(): void {
-    const manualFactories = this.factories.filter((factory) => !this.autoDiscoveredFactories.has(factory));
+    const manualFactories = this.factories.filter(
+      (factory) => !this.autoDiscoveredFactories.has(factory),
+    );
 
     this.autoDiscovered = false;
     this.algorithmToFactory.clear();
@@ -214,6 +237,8 @@ export function getEncryptionManagerFactoryRegistry(): EncryptionManagerFactoryR
   return globalRegistry;
 }
 
-export function registerEncryptionManagerFactory(factory: EncryptionManagerFactory): void {
+export function registerEncryptionManagerFactory(
+  factory: EncryptionManagerFactory,
+): void {
   globalRegistry.registerFactory(factory);
 }

@@ -1,4 +1,5 @@
 import {
+  type DataFrame,
   type FameEnvelope,
   type KeyRequestFrame,
   type EncryptionHeader,
@@ -6,22 +7,24 @@ import {
   type FameDeliveryContext,
   createFameEnvelope,
   localDeliveryContext,
-} from "naylence-core";
+} from "@naylence/core";
 import {
   EncryptionResult,
   type EncryptionManager,
   type EncryptionOptions,
   FIXED_PREFIX_LEN,
-} from "naylence-runtime";
-import type { KeyProvider } from "naylence-runtime";
-import type { KeyRecord } from "naylence-runtime";
-import type { CryptoProvider } from "naylence-runtime";
-import { sealedEncrypt, sealedDecrypt } from "naylence-runtime";
-import { urlsafeBase64Encode, urlsafeBase64Decode } from "naylence-runtime";
-import { getLogger } from "naylence-runtime";
-import { NodeLike } from "naylence-runtime";
+} from "@naylence/runtime";
+import type { KeyProvider } from "@naylence/runtime";
+import type { KeyRecord } from "@naylence/runtime";
+import type { CryptoProvider } from "@naylence/runtime";
+import { sealedEncrypt, sealedDecrypt } from "@naylence/runtime";
+import { urlsafeBase64Encode, urlsafeBase64Decode } from "@naylence/runtime";
+import { getLogger } from "@naylence/runtime";
+import { NodeLike } from "@naylence/runtime";
 
-const logger = getLogger("naylence.advanced.encryption.x25519");
+const logger = getLogger(
+  "naylence.fame.security.encryption.sealed.x25519_encryption_manager",
+);
 
 interface X25519EncryptionManagerDependencies {
   readonly keyProvider: KeyProvider;
@@ -29,7 +32,13 @@ interface X25519EncryptionManagerDependencies {
   readonly cryptoProvider?: CryptoProvider | null;
 }
 
-type Serializable = Record<string, unknown> | unknown[] | string | number | boolean | null;
+type Serializable =
+  | Record<string, unknown>
+  | unknown[]
+  | string
+  | number
+  | boolean
+  | null;
 
 export class X25519EncryptionManager implements EncryptionManager {
   private readonly keyProvider: KeyProvider;
@@ -38,7 +47,11 @@ export class X25519EncryptionManager implements EncryptionManager {
   private readonly pendingEnvelopes = new Map<string, FameEnvelope[]>();
   private readonly keyRequestsInProgress = new Set<string>();
 
-  constructor({ keyProvider, nodeLike = null, cryptoProvider = null }: X25519EncryptionManagerDependencies) {
+  constructor({
+    keyProvider,
+    nodeLike = null,
+    cryptoProvider = null,
+  }: X25519EncryptionManagerDependencies) {
     this.keyProvider = keyProvider;
     this.nodeLike = nodeLike;
     this.cryptoProvider = cryptoProvider;
@@ -46,7 +59,7 @@ export class X25519EncryptionManager implements EncryptionManager {
 
   public async encryptEnvelope(
     envelope: FameEnvelope,
-    opts: EncryptionOptions | null = null
+    opts: EncryptionOptions | null = null,
   ): Promise<EncryptionResult> {
     if (!this.isDataFrameEnvelope(envelope) || !this.hasPayload(envelope)) {
       return EncryptionResult.skipped(envelope);
@@ -67,7 +80,11 @@ export class X25519EncryptionManager implements EncryptionManager {
 
     if (!recipPub || !recipKid) {
       // This path is for when we have a kid but don't have the key yet
-      await this.queueEnvelopeForKey(envelope, opts, recipKid ?? this.deriveTemporaryKeyId(opts));
+      await this.queueEnvelopeForKey(
+        envelope,
+        opts,
+        recipKid ?? this.deriveTemporaryKeyId(opts),
+      );
       return EncryptionResult.queued();
     }
 
@@ -83,13 +100,16 @@ export class X25519EncryptionManager implements EncryptionManager {
 
   public async decryptEnvelope(
     envelope: FameEnvelope,
-    opts: EncryptionOptions | null = null
+    opts: EncryptionOptions | null = null,
   ): Promise<FameEnvelope> {
     if (!this.isDecryptableEnvelope(envelope)) {
       return envelope;
     }
 
-    if (!("payload" in envelope.frame) || typeof envelope.frame.payload !== "string") {
+    if (
+      !("payload" in envelope.frame) ||
+      typeof envelope.frame.payload !== "string"
+    ) {
       return envelope;
     }
 
@@ -106,12 +126,17 @@ export class X25519EncryptionManager implements EncryptionManager {
       }
 
       const plaintext = sealedDecrypt(blob, privateKey);
-      const payloadWithCodec = JSON.parse(new TextDecoder().decode(plaintext)) as {
+      const payloadWithCodec = JSON.parse(
+        new TextDecoder().decode(plaintext),
+      ) as {
         payload: unknown;
         original_codec?: string | null;
       };
 
-      const frame = envelope.frame as { payload?: unknown; codec?: string | null };
+      const frame = envelope.frame as {
+        payload?: unknown;
+        codec?: string | null;
+      };
       frame.payload = payloadWithCodec.payload as Serializable;
       frame.codec = payloadWithCodec.original_codec ?? undefined;
 
@@ -136,7 +161,7 @@ export class X25519EncryptionManager implements EncryptionManager {
       key_id: keyId,
       pending_keys: Array.from(this.pendingEnvelopes.keys()),
     });
-    
+
     const queued = this.pendingEnvelopes.get(keyId);
     if (!queued || queued.length === 0) {
       logger.debug("no_queued_envelopes_for_key", {
@@ -181,14 +206,14 @@ export class X25519EncryptionManager implements EncryptionManager {
   private async encryptWithKey(
     envelope: FameEnvelope,
     recipientPublicKey: Uint8Array,
-    recipientKeyId: string
+    recipientKeyId: string,
   ): Promise<EncryptionResult> {
     if (!this.isDataFrameEnvelope(envelope)) {
       return EncryptionResult.skipped(envelope);
     }
 
-    const frame = envelope.frame;
-    if (!("payload" in frame) || !("codec" in frame)) {
+    const frame = envelope.frame as DataFrame;
+    if (frame.payload === undefined || frame.payload === null) {
       return EncryptionResult.skipped(envelope);
     }
 
@@ -197,7 +222,9 @@ export class X25519EncryptionManager implements EncryptionManager {
       payload: this.makeJsonSerializable(frame.payload),
     };
 
-    const payloadBytes = new TextEncoder().encode(JSON.stringify(payloadWithCodec));
+    const payloadBytes = new TextEncoder().encode(
+      JSON.stringify(payloadWithCodec),
+    );
     const sealedBlob = sealedEncrypt(payloadBytes, recipientPublicKey);
     const prefix = sealedBlob.subarray(0, FIXED_PREFIX_LEN);
     const ciphertext = sealedBlob.subarray(FIXED_PREFIX_LEN);
@@ -221,7 +248,7 @@ export class X25519EncryptionManager implements EncryptionManager {
   }
 
   private async resolveRecipientKey(
-    opts: EncryptionOptions | null
+    opts: EncryptionOptions | null,
   ): Promise<{ recipPub: Uint8Array | null; recipKid: string | null }> {
     if (opts) {
       const directKey = this.extractKeyFromOptions(opts);
@@ -240,7 +267,7 @@ export class X25519EncryptionManager implements EncryptionManager {
 
       if (opts.requestAddress) {
         const addressPath = String(opts.requestAddress);
-        
+
         // Don't try to resolve locally - this indicates we should request the key
         // The SecurityPolicy is responsible for looking up keys by address
         // This matches Python's design (lines 119-124 in x25519_encryption_manager.py)
@@ -254,10 +281,15 @@ export class X25519EncryptionManager implements EncryptionManager {
 
   private async resolvePrivateKey(
     envelope: FameEnvelope,
-    opts: EncryptionOptions | null
+    opts: EncryptionOptions | null,
   ): Promise<Uint8Array | null> {
     const header = envelope.sec?.enc;
-    const candidateKeys = [opts?.privKey, opts?.priv_key, opts?.privateKey, opts?.channelKey];
+    const candidateKeys = [
+      opts?.privKey,
+      opts?.priv_key,
+      opts?.privateKey,
+      opts?.channelKey,
+    ];
 
     for (const candidate of candidateKeys) {
       const normalized = this.toUint8Array(candidate);
@@ -266,7 +298,8 @@ export class X25519EncryptionManager implements EncryptionManager {
       }
     }
 
-    const kid = header?.kid && header.kid !== "recip-kid-stub" ? header.kid : null;
+    const kid =
+      header?.kid && header.kid !== "recip-kid-stub" ? header.kid : null;
     if (!kid) {
       const fallback = this.cryptoProvider?.encryptionPrivatePem;
       if (!fallback) {
@@ -275,40 +308,79 @@ export class X25519EncryptionManager implements EncryptionManager {
       return this.decodePemToRawKey(fallback, "private");
     }
 
-    try {
-      const record = await this.keyProvider.getKey(kid);
-      const fromRecord = this.extractPrivateKeyFromRecord(record);
-      if (fromRecord) {
-        return fromRecord;
+    const record = await this.safeGetKeyRecord(kid);
+
+    const fromRecord = record ? this.extractPrivateKeyFromRecord(record) : null;
+    if (fromRecord) {
+      return fromRecord;
+    }
+
+    const providerKeyId = this.cryptoProvider?.encryptionKeyId ?? null;
+    const providerPem = this.cryptoProvider?.encryptionPrivatePem ?? null;
+
+    if (providerKeyId) {
+      const providerRecord =
+        kid === providerKeyId
+          ? record
+          : await this.safeGetKeyRecord(providerKeyId);
+      const providerRecordKey = providerRecord
+        ? this.extractPrivateKeyFromRecord(providerRecord)
+        : null;
+
+      if (providerRecordKey) {
+        logger.debug("using_provider_key_record_private_key", {
+          kid,
+          provider_key_id: providerKeyId,
+          mismatched_kid: kid && providerKeyId !== kid ? kid : null,
+        });
+        return providerRecordKey;
       }
-    } catch (error) {
-      logger.debug("private_key_lookup_failed", {
+    }
+
+    if (!providerPem) {
+      if (kid && providerKeyId && providerKeyId !== kid) {
+        logger.debug("crypto_provider_key_id_mismatch_no_private_key", {
+          kid,
+          provider_key_id: providerKeyId,
+        });
+      }
+      return null;
+    }
+
+    const fallbackKey = this.decodePemToRawKey(providerPem, "private");
+    if (!fallbackKey) {
+      return null;
+    }
+
+    if (!kid || providerKeyId === kid) {
+      logger.debug("using_crypto_provider_private_key_fallback", {
+        kid: kid ?? null,
+        provider_key_id: providerKeyId,
+      });
+    } else {
+      logger.warning("crypto_provider_key_id_mismatch_using_private_key", {
         kid,
-        error: error instanceof Error ? error.message : String(error),
+        provider_key_id: providerKeyId,
+        key_record_present: Boolean(record),
       });
     }
 
-    if (this.cryptoProvider && this.cryptoProvider.encryptionKeyId === kid) {
-      const pem = this.cryptoProvider.encryptionPrivatePem;
-      if (pem) {
-        return this.decodePemToRawKey(pem, "private");
-      }
-    }
-
-    return null;
+    return fallbackKey;
   }
 
   private async queueEnvelopeForKey(
     envelope: FameEnvelope,
     opts: EncryptionOptions | null,
-    recipientKeyId: string
+    recipientKeyId: string,
   ): Promise<void> {
     logger.debug("queueing_envelope_for_sealed_encryption", {
       envelope_id: envelope.id,
       recipient_key_id: recipientKeyId,
-      request_address: opts?.requestAddress ? String(opts.requestAddress) : undefined,
+      request_address: opts?.requestAddress
+        ? String(opts.requestAddress)
+        : undefined,
     });
-    
+
     const queue = this.pendingEnvelopes.get(recipientKeyId) ?? [];
     queue.push(envelope);
     this.pendingEnvelopes.set(recipientKeyId, queue);
@@ -330,9 +402,10 @@ export class X25519EncryptionManager implements EncryptionManager {
 
     try {
       // Convert FameAddress to string for the frame schema
-      const requestAddressString = typeof opts.requestAddress === 'string' 
-        ? opts.requestAddress 
-        : opts.requestAddress.toString();
+      const requestAddressString =
+        typeof opts.requestAddress === "string"
+          ? opts.requestAddress
+          : opts.requestAddress.toString();
 
       const requestFrame: KeyRequestFrame = {
         type: "KeyRequest",
@@ -372,6 +445,24 @@ export class X25519EncryptionManager implements EncryptionManager {
       return this.extractPublicKeyFromRecord(record);
     } catch (error) {
       logger.debug("recipient_key_lookup_failed", {
+        kid,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  private async safeGetKeyRecord(
+    kid: string | null,
+  ): Promise<KeyRecord | null> {
+    if (!kid) {
+      return null;
+    }
+
+    try {
+      return await this.keyProvider.getKey(kid);
+    } catch (error) {
+      logger.debug("private_key_lookup_failed", {
         kid,
         error: error instanceof Error ? error.message : String(error),
       });
@@ -419,7 +510,10 @@ export class X25519EncryptionManager implements EncryptionManager {
     return null;
   }
 
-  private decodeKeyMaterial(value: unknown, keyType: "public" | "private"): Uint8Array | null {
+  private decodeKeyMaterial(
+    value: unknown,
+    keyType: "public" | "private",
+  ): Uint8Array | null {
     if (!value) {
       return null;
     }
@@ -447,9 +541,14 @@ export class X25519EncryptionManager implements EncryptionManager {
     return null;
   }
 
-  private decodePemToRawKey(pem: string, keyType: "public" | "private"): Uint8Array | null {
+  private decodePemToRawKey(
+    pem: string,
+    keyType: "public" | "private",
+  ): Uint8Array | null {
     const lines = pem.replace(/\r/g, "").split("\n");
-    const base64Lines = lines.filter((line) => !line.startsWith("---") && line.trim().length > 0);
+    const base64Lines = lines.filter(
+      (line) => !line.startsWith("---") && line.trim().length > 0,
+    );
     if (base64Lines.length === 0) {
       return null;
     }
@@ -471,11 +570,7 @@ export class X25519EncryptionManager implements EncryptionManager {
   }
 
   private extractKeyFromOptions(opts: EncryptionOptions): Uint8Array | null {
-    const candidates = [
-      opts.recipPub,
-      opts.recipientPublicKey,
-      opts.recip_pub,
-    ];
+    const candidates = [opts.recipPub, opts.recipientPublicKey, opts.recip_pub];
 
     for (const candidate of candidates) {
       const normalized = this.toUint8Array(candidate);
@@ -527,7 +622,9 @@ export class X25519EncryptionManager implements EncryptionManager {
   }
 
   private isDataFrameEnvelope(envelope: FameEnvelope): boolean {
-    return Boolean(envelope.frame && (envelope.frame as { type?: string }).type === "Data");
+    return Boolean(
+      envelope.frame && (envelope.frame as { type?: string }).type === "Data",
+    );
   }
 
   private hasPayload(envelope: FameEnvelope): boolean {
@@ -575,7 +672,10 @@ export class X25519EncryptionManager implements EncryptionManager {
         return (value as any).dict();
       }
 
-      if ((value as Record<string, unknown>).__proto__ || Object.getPrototypeOf(value) !== Object.prototype) {
+      if (
+        (value as Record<string, unknown>).__proto__ ||
+        Object.getPrototypeOf(value) !== Object.prototype
+      ) {
         return { ...(value as Record<string, unknown>) };
       }
 
@@ -610,7 +710,10 @@ export class X25519EncryptionManager implements EncryptionManager {
 
     if (typeof atob === "function") {
       try {
-        const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+        const padded = normalized.padEnd(
+          Math.ceil(normalized.length / 4) * 4,
+          "=",
+        );
         const binary = atob(padded);
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i += 1) {

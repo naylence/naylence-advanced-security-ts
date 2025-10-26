@@ -1,26 +1,33 @@
-import type { FameEnvelope } from "naylence-core";
+import type { FameEnvelope } from "@naylence/core";
 import type {
-    EncryptionFactoryDependencies,
-    EncryptionManagerFactory,
-    SecureChannelManager,
-    CryptoProvider,
-    KeyProvider,
-    NodeEventListener,
-    NodeLike,
-    AttachInfo,
-} from "naylence-runtime";
+  EncryptionFactoryDependencies,
+  EncryptionManagerFactory,
+  SecureChannelManager,
+  CryptoProvider,
+  KeyProvider,
+  NodeEventListener,
+  NodeLike,
+  AttachInfo,
+} from "@naylence/runtime";
 import {
-    EncryptionResult,
-    type EncryptionManager,
-    type EncryptionOptions,
-    getLogger,
-} from "naylence-runtime";
+  EncryptionResult,
+  type EncryptionManager,
+  type EncryptionOptions,
+  getLogger,
+} from "@naylence/runtime";
 
 import { getEncryptionManagerFactoryRegistry } from "./encryption-manager-registry.js";
 
-const logger = getLogger("naylence.advanced.encryption.composite");
+const logger = getLogger(
+  "naylence.fame.security.encryption.composite_encryption_manager",
+);
 
-const DEFAULT_SEALED_ALGORITHMS = ["X25519", "ECDH-ES+A256GCM", "chacha20-poly1305", "aes-256-gcm"] as const;
+const DEFAULT_SEALED_ALGORITHMS = [
+  "X25519",
+  "ECDH-ES+A256GCM",
+  "chacha20-poly1305",
+  "aes-256-gcm",
+] as const;
 const DEFAULT_CHANNEL_ALGORITHMS = ["chacha20-poly1305-channel"] as const;
 
 export interface CompositeEncryptionManagerDependencies {
@@ -34,13 +41,20 @@ export interface CompositeEncryptionManagerDependencies {
 
 type ManagerInstance = EncryptionManager & Partial<NodeEventListener>;
 
-function isNodeEventListenerInstance(value: EncryptionManager): value is ManagerInstance {
-  return typeof (value as Partial<NodeEventListener>).onNodeStarted === "function" ||
-    typeof (value as Partial<NodeEventListener>).onNodeAttachToUpstream === "function" ||
-    typeof (value as Partial<NodeEventListener>).onNodeStopped === "function";
+function isNodeEventListenerInstance(
+  value: EncryptionManager,
+): value is ManagerInstance {
+  return (
+    typeof (value as Partial<NodeEventListener>).onNodeStarted === "function" ||
+    typeof (value as Partial<NodeEventListener>).onNodeAttachToUpstream ===
+      "function" ||
+    typeof (value as Partial<NodeEventListener>).onNodeStopped === "function"
+  );
 }
 
-export class CompositeEncryptionManager implements EncryptionManager, NodeEventListener {
+export class CompositeEncryptionManager
+  implements EncryptionManager, NodeEventListener
+{
   public readonly priority = 1000;
 
   private secureChannelManager: SecureChannelManager | null;
@@ -67,11 +81,16 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
     this.keyProvider = keyProvider;
     this.cryptoProvider = cryptoProvider ?? null;
     this.nodeLike = nodeLike ?? null;
-    this.supportedSealedAlgorithms = supportedSealedAlgorithms ?? DEFAULT_SEALED_ALGORITHMS;
-    this.supportedChannelAlgorithms = supportedChannelAlgorithms ?? DEFAULT_CHANNEL_ALGORITHMS;
+    this.supportedSealedAlgorithms =
+      supportedSealedAlgorithms ?? DEFAULT_SEALED_ALGORITHMS;
+    this.supportedChannelAlgorithms =
+      supportedChannelAlgorithms ?? DEFAULT_CHANNEL_ALGORITHMS;
   }
 
-  public async encryptEnvelope(envelope: FameEnvelope, opts?: EncryptionOptions): Promise<EncryptionResult> {
+  public async encryptEnvelope(
+    envelope: FameEnvelope,
+    opts?: EncryptionOptions,
+  ): Promise<EncryptionResult> {
     const manager = await this.getManagerForOptions(opts ?? null);
     if (!manager) {
       return EncryptionResult.skipped(envelope);
@@ -87,7 +106,10 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
     }
   }
 
-  public async decryptEnvelope(envelope: FameEnvelope, opts?: EncryptionOptions): Promise<FameEnvelope> {
+  public async decryptEnvelope(
+    envelope: FameEnvelope,
+    opts?: EncryptionOptions,
+  ): Promise<FameEnvelope> {
     const algorithm = envelope.sec?.enc?.alg;
     if (!algorithm) {
       return envelope;
@@ -115,7 +137,9 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
       return;
     }
 
-    logger.debug("composite_notify_channel_established", { channel_id: channelId });
+    logger.debug("composite_notify_channel_established", {
+      channel_id: channelId,
+    });
 
     await this.notifyManagers(factories, async (manager, factoryKey) => {
       const channelAware = manager as {
@@ -132,17 +156,26 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
     });
   }
 
-  public async notifyChannelFailed(channelId: string, reason = "handshake_failed"): Promise<void> {
+  public async notifyChannelFailed(
+    channelId: string,
+    reason = "handshake_failed",
+  ): Promise<void> {
     const factories = this.factoryRegistry.getFactoriesByType("channel");
     if (factories.length === 0) {
       return;
     }
 
-    logger.debug("composite_notify_channel_failed", { channel_id: channelId, reason });
+    logger.debug("composite_notify_channel_failed", {
+      channel_id: channelId,
+      reason,
+    });
 
     await this.notifyManagers(factories, async (manager, factoryKey) => {
       const channelAware = manager as {
-        notifyChannelFailed?: (channelId: string, reason?: string) => Promise<void> | void;
+        notifyChannelFailed?: (
+          channelId: string,
+          reason?: string,
+        ) => Promise<void> | void;
       };
 
       if (typeof channelAware.notifyChannelFailed === "function") {
@@ -190,7 +223,10 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
     this.nodeReady = true;
   }
 
-  public async onNodeAttachToUpstream(node: NodeLike, attachInfo: AttachInfo): Promise<void> {
+  public async onNodeAttachToUpstream(
+    node: NodeLike,
+    attachInfo: AttachInfo,
+  ): Promise<void> {
     this.lastAttachInfo = attachInfo;
     await this.notifyNodeListeners(async (listener) => {
       await listener.onNodeAttachToUpstream?.(node, attachInfo);
@@ -218,8 +254,12 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
     }
   }
 
-  private async getManagerForOptions(opts: EncryptionOptions | null): Promise<EncryptionManager | null> {
-    const factory = this.factoryRegistry.getFactoryForOptions(opts ?? undefined);
+  private async getManagerForOptions(
+    opts: EncryptionOptions | null,
+  ): Promise<EncryptionManager | null> {
+    const factory = this.factoryRegistry.getFactoryForOptions(
+      opts ?? undefined,
+    );
     if (!factory) {
       logger.debug("composite_no_factory_for_options", { opts });
       return null;
@@ -228,7 +268,9 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
     return await this.getOrCreateManager(factory, "options");
   }
 
-  private async getManagerForAlgorithm(algorithm: string): Promise<EncryptionManager | null> {
+  private async getManagerForAlgorithm(
+    algorithm: string,
+  ): Promise<EncryptionManager | null> {
     const factory = this.factoryRegistry.getFactoryForAlgorithm(algorithm);
     if (!factory) {
       logger.debug("composite_no_factory_for_algorithm", { algorithm });
@@ -240,7 +282,7 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
 
   private async getOrCreateManager(
     factory: EncryptionManagerFactory,
-    context: string
+    context: string,
   ): Promise<EncryptionManager | null> {
     const key = this.resolveFactoryKey(factory);
     const existing = this.managerInstances.get(key);
@@ -254,12 +296,14 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
         ...(this.secureChannelManager !== null
           ? { secureChannelManager: this.secureChannelManager }
           : {}),
-        ...(this.cryptoProvider !== null ? { cryptoProvider: this.cryptoProvider } : {}),
+        ...(this.cryptoProvider !== null
+          ? { cryptoProvider: this.cryptoProvider }
+          : {}),
         ...(this.nodeLike !== null ? { nodeLike: this.nodeLike } : {}),
       };
 
-  const manager = await factory.create(null, dependencies);
-  this.managerInstances.set(key, manager);
+      const manager = await factory.create(null, dependencies);
+      this.managerInstances.set(key, manager);
 
       await this.applyNodeContext(manager, key);
 
@@ -282,13 +326,15 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
 
   private async notifyManagers(
     factories: readonly EncryptionManagerFactory[],
-    callback: (manager: EncryptionManager, factoryKey: string) => Promise<void>
+    callback: (manager: EncryptionManager, factoryKey: string) => Promise<void>,
   ): Promise<void> {
     for (const factory of factories) {
       const factoryKey = this.resolveFactoryKey(factory);
       const manager = this.managerInstances.get(factoryKey);
       if (!manager) {
-        logger.debug("composite_skip_notification_no_manager", { factory: factoryKey });
+        logger.debug("composite_skip_notification_no_manager", {
+          factory: factoryKey,
+        });
         continue;
       }
 
@@ -304,7 +350,7 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
   }
 
   private async notifyNodeListeners(
-    callback: (listener: ManagerInstance) => Promise<void>
+    callback: (listener: ManagerInstance) => Promise<void>,
   ): Promise<void> {
     for (const manager of this.managerInstances.values()) {
       if (!isNodeEventListenerInstance(manager)) {
@@ -322,8 +368,15 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
     }
   }
 
-  private async applyNodeContext(manager: EncryptionManager, factoryKey: string): Promise<void> {
-    if (!this.nodeLike || !this.nodeReady || !isNodeEventListenerInstance(manager)) {
+  private async applyNodeContext(
+    manager: EncryptionManager,
+    factoryKey: string,
+  ): Promise<void> {
+    if (
+      !this.nodeLike ||
+      !this.nodeReady ||
+      !isNodeEventListenerInstance(manager)
+    ) {
       return;
     }
 
@@ -342,7 +395,10 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
     }
 
     try {
-      await manager.onNodeAttachToUpstream?.(this.nodeLike, this.lastAttachInfo);
+      await manager.onNodeAttachToUpstream?.(
+        this.nodeLike,
+        this.lastAttachInfo,
+      );
     } catch (error) {
       logger.error("composite_apply_node_context_failed", {
         stage: "onNodeAttachToUpstream",
@@ -354,5 +410,58 @@ export class CompositeEncryptionManager implements EncryptionManager, NodeEventL
 
   private resolveFactoryKey(factory: EncryptionManagerFactory): string {
     return factory.constructor?.name ?? "anonymous-factory";
+  }
+
+  /**
+   * Clear channel cache for a destination address.
+   * Delegates to channel encryption manager instances if available.
+   */
+  public clearChannelCacheForDestination(destination: string): void {
+    const channelFactories = this.factoryRegistry.getFactoriesByType("channel");
+    for (const factory of channelFactories) {
+      const factoryKey = this.resolveFactoryKey(factory);
+      const manager = this.managerInstances.get(factoryKey);
+      if (manager) {
+        const channelAware = manager as {
+          clearChannelCacheForDestination?: (destination: string) => void;
+        };
+        if (
+          typeof channelAware.clearChannelCacheForDestination === "function"
+        ) {
+          channelAware.clearChannelCacheForDestination(destination);
+          logger.debug("composite_cleared_channel_cache", {
+            destination,
+            factory: factoryKey,
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Remove all channels for a destination.
+   * Delegates to secure channel manager if available.
+   */
+  public removeChannelsForDestination(destination: string): number {
+    if (!this.secureChannelManager) {
+      return 0;
+    }
+
+    if (
+      typeof this.secureChannelManager.removeChannelsForDestination ===
+      "function"
+    ) {
+      const removed =
+        this.secureChannelManager.removeChannelsForDestination(destination);
+      if (removed > 0) {
+        logger.debug("composite_removed_channels", {
+          destination,
+          count: removed,
+        });
+      }
+      return removed;
+    }
+
+    return 0;
   }
 }

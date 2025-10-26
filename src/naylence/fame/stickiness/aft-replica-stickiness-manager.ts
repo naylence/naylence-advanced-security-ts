@@ -1,16 +1,25 @@
-import type { FameDeliveryContext, FameEnvelope, Stickiness } from "naylence-core";
-import { DeliveryOriginType } from "naylence-core";
-import { BaseNodeEventListener } from "naylence-runtime";
-import type { NodeLike } from "naylence-runtime";
-import { getLogger } from "naylence-runtime";
+import type {
+  FameDeliveryContext,
+  FameEnvelope,
+  Stickiness,
+} from "@naylence/core";
+import { DeliveryOriginType } from "@naylence/core";
+import { BaseNodeEventListener } from "@naylence/runtime";
+import type { NodeLike } from "@naylence/runtime";
+import { getLogger } from "@naylence/runtime";
 
 import type { AFTHelper } from "./aft-helper.js";
-import { createAftHelper, DEFAULT_STICKINESS_SECURITY_LEVEL } from "./aft-helper.js";
+import {
+  createAftHelper,
+  DEFAULT_STICKINESS_SECURITY_LEVEL,
+} from "./aft-helper.js";
 import type { AFTSigner } from "./aft-signer.js";
 import { StickinessMode, normalizeStickinessMode } from "./stickiness-mode.js";
-import type { ReplicaStickinessManager } from "naylence-runtime";
+import type { ReplicaStickinessManager } from "@naylence/runtime";
 
-const logger = getLogger("naylence.advanced.stickiness.aft-replica-manager");
+const logger = getLogger(
+  "naylence.fame.stickiness.aft_replica_stickiness_manager",
+);
 
 type StickinessAwareContext = FameDeliveryContext & {
   stickinessRequired?: boolean | null;
@@ -48,8 +57,9 @@ export class AFTReplicaStickinessManager
   public constructor(options: AFTReplicaStickinessManagerOptions = {}) {
     super();
     this.securityLevel =
-      normalizeStickinessMode(options.securityLevel ?? DEFAULT_STICKINESS_SECURITY_LEVEL) ??
-      DEFAULT_STICKINESS_SECURITY_LEVEL;
+      normalizeStickinessMode(
+        options.securityLevel ?? DEFAULT_STICKINESS_SECURITY_LEVEL,
+      ) ?? DEFAULT_STICKINESS_SECURITY_LEVEL;
     this.aftHelper = options.aftHelper ?? null;
     this.maxTtlSec = options.maxTtlSec ?? 7200;
     this.isInitialized = this.aftHelper !== null;
@@ -85,7 +95,7 @@ export class AFTReplicaStickinessManager
   public async onForwardUpstream(
     _node: NodeLike,
     envelope: FameEnvelope,
-    context?: FameDeliveryContext
+    context?: FameDeliveryContext,
   ): Promise<FameEnvelope | null> {
     if (!context) {
       return envelope;
@@ -103,12 +113,17 @@ export class AFTReplicaStickinessManager
 
     const stickinessContext = context as StickinessAwareContext;
 
-    if (isStickinessRequired(stickinessContext) && context.originType === DeliveryOriginType.LOCAL) {
+    if (
+      isStickinessRequired(stickinessContext) &&
+      context.originType === DeliveryOriginType.LOCAL
+    ) {
       if (this.negotiatedStickiness) {
         const negotiated = this.negotiatedStickiness;
         if (
           negotiated.enabled === false ||
-          (negotiated.mode !== null && negotiated.mode !== undefined && negotiated.mode !== "aft")
+          (negotiated.mode !== null &&
+            negotiated.mode !== undefined &&
+            negotiated.mode !== "aft")
         ) {
           logger.debug("aft_injection_skipped_due_to_policy", {
             envelope_id: envelope.id,
@@ -193,14 +208,18 @@ export class AFTReplicaStickinessManager
 
     const cryptoProvider = node.cryptoProvider ?? null;
     if (!cryptoProvider) {
-      logger.error("aft_replica_stickiness_manager_cannot_initialize_no_crypto_provider", {
-        node_id: node.id ?? "unknown",
-      });
+      logger.error(
+        "aft_replica_stickiness_manager_cannot_initialize_no_crypto_provider",
+        {
+          node_id: node.id ?? "unknown",
+        },
+      );
       return;
     }
 
     const keyId =
-      typeof cryptoProvider.signatureKeyId === "string" && cryptoProvider.signatureKeyId.length > 0
+      typeof cryptoProvider.signatureKeyId === "string" &&
+      cryptoProvider.signatureKeyId.length > 0
         ? cryptoProvider.signatureKeyId
         : "default-key-id";
     const privateKeyPem =
@@ -250,7 +269,9 @@ export class AFTReplicaStickinessManager
   }
 }
 
-export function createAftReplicaStickinessManager(aftHelper: AFTHelper): AFTReplicaStickinessManager {
+export function createAftReplicaStickinessManager(
+  aftHelper: AFTHelper,
+): AFTReplicaStickinessManager {
   return new AFTReplicaStickinessManager({ aftHelper });
 }
 
