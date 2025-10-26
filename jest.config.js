@@ -1,20 +1,53 @@
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const require = createRequire(import.meta.url);
+
 const packageMappings = [
-  ['@naylence/core', '../naylence-core-ts/dist/cjs'],
-  ['@naylence/factory', '../naylence-factory-ts/dist/cjs'],
-  ['@naylence/runtime', '../naylence-runtime-ts/dist/cjs'],
-  ['naylence-core', '../naylence-core-ts/dist/cjs'],
-  ['naylence-core-ts', '../naylence-core-ts/dist/cjs'],
-  ['naylence-factory', '../naylence-factory-ts/dist/cjs'],
-  ['naylence-factory-ts', '../naylence-factory-ts/dist/cjs'],
-  ['naylence-runtime', '../naylence-runtime-ts/dist/cjs'],
-  ['naylence-runtime-ts', '../naylence-runtime-ts/dist/cjs'],
+  {
+    alias: '@naylence/core',
+    localDir: '../naylence-core-ts/dist/cjs',
+    packageEntry: '@naylence/core/dist/cjs/index.js',
+  },
+  {
+    alias: '@naylence/factory',
+    localDir: '../naylence-factory-ts/dist/cjs',
+    packageEntry: '@naylence/factory/dist/cjs/index.js',
+  },
+  {
+    alias: '@naylence/runtime',
+    localDir: '../naylence-runtime-ts/dist/cjs',
+    packageEntry: '@naylence/runtime/dist/cjs/index.js',
+  },
+  {
+    alias: 'naylence-core',
+    localDir: '../naylence-core-ts/dist/cjs',
+  },
+  {
+    alias: 'naylence-core-ts',
+    localDir: '../naylence-core-ts/dist/cjs',
+  },
+  {
+    alias: 'naylence-factory',
+    localDir: '../naylence-factory-ts/dist/cjs',
+  },
+  {
+    alias: 'naylence-factory-ts',
+    localDir: '../naylence-factory-ts/dist/cjs',
+  },
+  {
+    alias: 'naylence-runtime',
+    localDir: '../naylence-runtime-ts/dist/cjs',
+  },
+  {
+    alias: 'naylence-runtime-ts',
+    localDir: '../naylence-runtime-ts/dist/cjs',
+  },
 ];
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -23,14 +56,28 @@ const moduleNameMapper = {
   '^(\\.{1,2}/.*)\\.js$': '$1',
 };
 
-for (const [alias, relativeDir] of packageMappings) {
+for (const { alias, localDir, packageEntry } of packageMappings) {
   const aliasRegex = escapeRegex(alias);
-  const distDir = resolve(__dirname, relativeDir);
+  const distDir = resolve(__dirname, localDir);
   const indexPath = resolve(distDir, 'index.js');
   const hasLocalBuild = existsSync(indexPath);
 
-  moduleNameMapper[`^${aliasRegex}$`] = hasLocalBuild ? indexPath : alias;
-  moduleNameMapper[`^${aliasRegex}/(.*)$`] = hasLocalBuild ? `${distDir}/$1` : `${alias}/$1`;
+  let resolvedIndexPath = hasLocalBuild ? indexPath : null;
+  let resolvedDir = hasLocalBuild ? distDir : null;
+
+  if (!hasLocalBuild && packageEntry) {
+    try {
+      resolvedIndexPath = require.resolve(packageEntry);
+      resolvedDir = dirname(resolvedIndexPath);
+    } catch (error) {
+      // Fall back to package alias if resolution fails.
+      resolvedIndexPath = null;
+      resolvedDir = null;
+    }
+  }
+
+  moduleNameMapper[`^${aliasRegex}$`] = resolvedIndexPath ?? alias;
+  moduleNameMapper[`^${aliasRegex}/(.*)$`] = resolvedDir ? `${resolvedDir}/$1` : `${alias}/$1`;
 }
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
