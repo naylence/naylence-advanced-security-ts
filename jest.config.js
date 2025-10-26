@@ -90,7 +90,7 @@ export default {
   ],
   moduleNameMapper,
   transformIgnorePatterns: [
-    'node_modules/(?!(@noble|yaml|jose)/)',
+    'node_modules/(?!(@naylence|@noble|yaml|jose)/)',
   ],
   transform: {
     '^.+\\.(ts|js|mjs)$': [
