@@ -27,26 +27,32 @@ const packageMappings = [
   {
     alias: 'naylence-core',
     localDir: '../naylence-core-ts/dist/cjs',
+    fallbackAlias: '@naylence/core',
   },
   {
     alias: 'naylence-core-ts',
     localDir: '../naylence-core-ts/dist/cjs',
+    fallbackAlias: '@naylence/core',
   },
   {
     alias: 'naylence-factory',
     localDir: '../naylence-factory-ts/dist/cjs',
+    fallbackAlias: '@naylence/factory',
   },
   {
     alias: 'naylence-factory-ts',
     localDir: '../naylence-factory-ts/dist/cjs',
+    fallbackAlias: '@naylence/factory',
   },
   {
     alias: 'naylence-runtime',
     localDir: '../naylence-runtime-ts/dist/cjs',
+    fallbackAlias: '@naylence/runtime',
   },
   {
     alias: 'naylence-runtime-ts',
     localDir: '../naylence-runtime-ts/dist/cjs',
+    fallbackAlias: '@naylence/runtime',
   },
 ];
 
@@ -56,7 +62,9 @@ const moduleNameMapper = {
   '^(\\.{1,2}/.*)\\.js$': '$1',
 };
 
-for (const { alias, localDir, packageEntry } of packageMappings) {
+const resolutionCache = new Map();
+
+for (const { alias, localDir, packageEntry, fallbackAlias } of packageMappings) {
   const aliasRegex = escapeRegex(alias);
   const distDir = resolve(__dirname, localDir);
   const indexPath = resolve(distDir, 'index.js');
@@ -76,8 +84,20 @@ for (const { alias, localDir, packageEntry } of packageMappings) {
     }
   }
 
+  if (!resolvedIndexPath && fallbackAlias) {
+    const fallbackResolution = resolutionCache.get(fallbackAlias);
+    if (fallbackResolution) {
+      resolvedIndexPath = fallbackResolution.indexPath;
+      resolvedDir = fallbackResolution.dir;
+    }
+  }
+
   moduleNameMapper[`^${aliasRegex}$`] = resolvedIndexPath ?? alias;
   moduleNameMapper[`^${aliasRegex}/(.*)$`] = resolvedDir ? `${resolvedDir}/$1` : `${alias}/$1`;
+
+  if (resolvedIndexPath && resolvedDir) {
+    resolutionCache.set(alias, { indexPath: resolvedIndexPath, dir: resolvedDir });
+  }
 }
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
