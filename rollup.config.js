@@ -12,6 +12,26 @@ if (!existsSync(esmEntry)) {
   );
 }
 
+const externalPackages = new Set([
+  '@naylence/core',
+  '@naylence/factory',
+  '@naylence/runtime',
+  'naylence-runtime',
+  'naylence-runtime-ts',
+  'naylence-factory',
+  'naylence-factory-ts',
+  'naylence-core',
+  'naylence-core-ts',
+]);
+
+const externalPrefixes = [
+  '@naylence/core/',
+  '@naylence/factory/',
+  '@naylence/runtime/',
+  'naylence-runtime/',
+  'naylence-runtime-ts/',
+];
+
 export default {
   input: esmEntry,
   output: {
@@ -28,13 +48,9 @@ export default {
     json(),
     commonjs(),
   ],
-  external: (id) => 
-    id === 'naylence-factory' || 
-    id === 'naylence-factory-ts' || 
-    id === 'naylence-runtime' ||
-    id === 'naylence-runtime-ts' ||
-    id === 'naylence-core' ||
-    id === 'naylence-core-ts' ||
+  external: (id) =>
+    externalPackages.has(id) ||
+    externalPrefixes.some((prefix) => id.startsWith(prefix)) ||
     id.startsWith('node:') ||
     id.startsWith('zod'),
 };

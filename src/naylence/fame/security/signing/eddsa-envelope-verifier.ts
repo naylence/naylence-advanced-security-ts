@@ -12,8 +12,8 @@ import {
   decodeBase64Url,
   frameDigest,
   immutableHeaders,
-} from "naylence-runtime/naylence/fame/security/signing/eddsa-signer-verifier.js";
-import { encodeUtf8 } from "naylence-runtime/naylence/fame/security/signing/eddsa-utils.js";
+} from "@naylence/runtime/naylence/fame/security/signing/eddsa-signer-verifier.js";
+import { encodeUtf8 } from "@naylence/runtime/naylence/fame/security/signing/eddsa-utils.js";
 import { JWKValidationError, validateSigningKey } from "@naylence/runtime";
 import { publicKeyFromX5c } from "../cert/util.js";
 

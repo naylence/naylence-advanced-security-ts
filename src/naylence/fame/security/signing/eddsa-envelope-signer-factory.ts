@@ -5,7 +5,7 @@ import {
   type EnvelopeSignerConfig,
 } from "@naylence/runtime";
 
-import type { EdDSAEnvelopeSignerOptions } from "naylence-runtime/naylence/fame/security/signing/eddsa-envelope-signer.js";
+import type { EdDSAEnvelopeSignerOptions } from "@naylence/runtime/naylence/fame/security/signing/eddsa-envelope-signer.js";
 
 export interface EdDSAEnvelopeSignerConfig extends EnvelopeSignerConfig {
   readonly type: "EdDSAEnvelopeSigner";
@@ -19,7 +19,7 @@ export const FACTORY_META = {
 } as const;
 
 type EdDSAEnvelopeSignerModule =
-  typeof import("naylence-runtime/naylence/fame/security/signing/eddsa-envelope-signer.js");
+  typeof import("@naylence/runtime/naylence/fame/security/signing/eddsa-envelope-signer.js");
 
 let eddsaEnvelopeSignerModulePromise: Promise<EdDSAEnvelopeSignerModule> | null =
   null;
@@ -27,7 +27,7 @@ let eddsaEnvelopeSignerModulePromise: Promise<EdDSAEnvelopeSignerModule> | null 
 async function getEdDSAEnvelopeSignerModule(): Promise<EdDSAEnvelopeSignerModule> {
   if (!eddsaEnvelopeSignerModulePromise) {
     eddsaEnvelopeSignerModulePromise = import(
-      "naylence-runtime/naylence/fame/security/signing/eddsa-envelope-signer.js"
+      "@naylence/runtime/naylence/fame/security/signing/eddsa-envelope-signer.js"
     );
   }
 
