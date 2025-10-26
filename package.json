@@ -1,5 +1,5 @@
 {
-  "name": "naylence-advanced-security",
+  "name": "@naylence/advanced-security",
   "version": "0.3.0",
   "type": "module",
   "description": "Advanced security utilities for the Naylence Fame runtime implemented in TypeScript.",
