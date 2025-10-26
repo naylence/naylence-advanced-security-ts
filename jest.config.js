@@ -89,11 +89,17 @@ for (const { alias, localDir, packageEntry, fallbackAlias } of packageMappings) 
     if (fallbackResolution) {
       resolvedIndexPath = fallbackResolution.indexPath;
       resolvedDir = fallbackResolution.dir;
+    } else {
+      moduleNameMapper[`^${aliasRegex}$`] = fallbackAlias;
+      moduleNameMapper[`^${aliasRegex}/(.*)$`] = `${fallbackAlias}/$1`;
+      continue;
     }
   }
 
   moduleNameMapper[`^${aliasRegex}$`] = resolvedIndexPath ?? alias;
-  moduleNameMapper[`^${aliasRegex}/(.*)$`] = resolvedDir ? `${resolvedDir}/$1` : `${alias}/$1`;
+  moduleNameMapper[`^${aliasRegex}/(.*)$`] = resolvedDir
+    ? `${resolvedDir}/$1`
+    : `${alias}/$1`;
 
   if (resolvedIndexPath && resolvedDir) {
     resolutionCache.set(alias, { indexPath: resolvedIndexPath, dir: resolvedDir });
