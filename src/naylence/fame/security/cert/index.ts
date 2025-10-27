@@ -3,6 +3,7 @@ export {
   type ValidateJwkX5cCertificateOptions,
   type ValidateJwkX5cCertificateResult,
   publicKeyFromX5c,
+  type PublicKeyFromX5cOptions,
 } from "./util.js";
 export { GRANT_PURPOSE_CA_SIGN } from "./grants.js";
 export {

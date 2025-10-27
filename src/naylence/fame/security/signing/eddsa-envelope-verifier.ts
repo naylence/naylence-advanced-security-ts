@@ -88,6 +88,7 @@ function ensureNobleSha512Fallback(): void {
 function normalizeCertificateKey(
   jwk: VerifierJwk,
   signingConfig: SigningConfig,
+  trustStorePem: string | null,
 ): string | null {
   if (!Array.isArray(jwk.x5c) || jwk.x5c.length === 0) {
     return null;
@@ -97,7 +98,6 @@ function normalizeCertificateKey(
     throw new Error("Certificate keys are disabled by signing policy");
   }
 
-  const trustStorePem = process.env.FAME_CA_CERTS;
   if (!trustStorePem) {
     throw new Error(
       "FAME_CA_CERTS environment variable must be set to a PEM file containing trusted CA certs when using certificate-based verification",
@@ -120,7 +120,12 @@ async function loadPublicKey(
   jwk: VerifierJwk,
   signingConfig: SigningConfig,
 ): Promise<Uint8Array> {
-  const certificateKey = normalizeCertificateKey(jwk, signingConfig);
+  const trustStorePem = await resolveTrustStorePem();
+  const certificateKey = normalizeCertificateKey(
+    jwk,
+    signingConfig,
+    trustStorePem,
+  );
 
   const candidate =
     certificateKey ??
@@ -135,6 +140,49 @@ async function loadPublicKey(
   }
 
   return decodeBase64Url(candidate);
+}
+
+function hasProcessEnv(): boolean {
+  return typeof process !== "undefined" && typeof process.env !== "undefined";
+}
+
+function isNodeProcess(): boolean {
+  return (
+    typeof process !== "undefined" &&
+    typeof process.release !== "undefined" &&
+    process.release?.name === "node"
+  );
+}
+
+async function resolveTrustStorePem(): Promise<string | null> {
+  if (!hasProcessEnv()) {
+    return null;
+  }
+
+  const rawValue = process.env?.FAME_CA_CERTS ?? null;
+  if (!rawValue || rawValue.trim().length === 0) {
+    return null;
+  }
+
+  const trimmed = rawValue.replace(/\r/gu, "").trim();
+  if (trimmed.startsWith("-----BEGIN")) {
+    return trimmed;
+  }
+
+  if (!isNodeProcess()) {
+    throw new Error(
+      "FAME_CA_CERTS must contain PEM-encoded certificates when running outside of Node.js",
+    );
+  }
+
+  try {
+    const fs = await import("node:fs/promises");
+    const content = await fs.readFile(trimmed, "utf8");
+    return content.replace(/\r/gu, "").trim();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to read trust store from ${trimmed}: ${reason}`);
+  }
 }
 
 export interface EdDSAEnvelopeVerifierOptions {
