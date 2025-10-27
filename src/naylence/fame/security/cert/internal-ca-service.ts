@@ -219,13 +219,6 @@ function hexToArrayBuffer(hex: string): ArrayBuffer {
   return bytes.buffer;
 }
 
-function encodeBitString(data: ArrayBuffer): ArrayBuffer {
-  const input = new Uint8Array(data);
-  const bitString = new Uint8Array(input.length + 1);
-  bitString.set(input, 1);
-  return bitString.buffer;
-}
-
 interface CertificateBuildOptions {
   subject: Name;
   issuer: Name;
@@ -295,7 +288,7 @@ async function createEd25519Certificate(
   const certificate = new Certificate({
     tbsCertificate,
     signatureAlgorithm,
-    signatureValue: encodeBitString(signature),
+    signatureValue: signature,
   });
 
   certificate.tbsCertificateRaw = tbsDer;
