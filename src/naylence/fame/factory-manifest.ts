@@ -17,7 +17,7 @@ export const MODULES = [
   "./security/signing/eddsa-envelope-verifier-factory.js",
   "./stickiness/aft-load-balancer-stickiness-manager-factory.js",
   "./stickiness/aft-replica-stickiness-manager-factory.js",
-  "./welcome/advanced-welcome-service-factory.js"
+  "./welcome/advanced-welcome-service-factory.js",
 ] as const;
 
 export type FactoryModuleSpec = (typeof MODULES)[number];

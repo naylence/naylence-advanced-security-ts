@@ -766,11 +766,7 @@ export class CASigningService extends CAService {
     );
 
     const issuerName = issuerIdentity.name;
-    const subjectName = buildCertificateName(
-      nodeSid,
-      "Naylence Fame",
-      "Fame Nodes",
-    );
+    const subjectName = new Name([]); // SPIFFE X.509-SVIDs require an empty subject DN
 
     const certDer = await createEd25519Certificate({
       subject: subjectName,
