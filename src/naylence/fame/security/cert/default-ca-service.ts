@@ -299,10 +299,52 @@ export class DefaultCAService extends CAService {
       console.debug("Using root CA for signing:", csr.requesterId);
     }
 
-    // TODO: Parse CSR, extract public key, and sign certificate
-    // For now, delegate to the signing service (which will throw until implemented)
+    // Issue the certificate using the configured signing service
     try {
-      return await signingService.issueCertificate(csr);
+      const { certificatePem, expiresAt } =
+        await signingService.issueCertificate(csr);
+
+      const chainParts: string[] = [certificatePem.trim()];
+      const rootCertPem = credentials.rootCaCertPem?.trim();
+      const signingCertPem = credentials.signingCertPem?.trim();
+
+      const normalizeCert = (pem: string | undefined): string | undefined =>
+        pem?.trim();
+
+      if (credentials.intermediateChainPem) {
+        const intermediateCerts = this.parseCertificateChain(
+          credentials.intermediateChainPem,
+        );
+
+        for (const certPem of intermediateCerts) {
+          const normalized = normalizeCert(certPem);
+          if (!normalized) {
+            continue;
+          }
+
+          if (normalized === chainParts[0]) {
+            continue;
+          }
+
+          if (rootCertPem && normalized === rootCertPem) {
+            continue;
+          }
+
+          chainParts.push(normalized);
+        }
+      } else if (signingCertPem && signingCertPem !== rootCertPem) {
+        if (signingCertPem !== chainParts[0]) {
+          chainParts.push(signingCertPem);
+        }
+      }
+
+      const certificateChainPem = chainParts.join("\n");
+
+      return {
+        certificatePem,
+        certificateChainPem,
+        expiresAt,
+      };
     } catch (error) {
       console.error("Certificate issuance failed:", csr.requesterId, error);
       throw error;
