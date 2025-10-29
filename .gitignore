@@ -3,5 +3,6 @@ dist/
 coverage/
 .nyc_output/
 *.log
+*.tsbuildinfo
 .DS_Store
 .vscode
