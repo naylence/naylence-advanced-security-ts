@@ -1,11 +1,10 @@
 {
   "name": "@naylence/advanced-security",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "type": "module",
   "description": "Advanced security utilities for the Naylence Fame runtime implemented in TypeScript.",
   "author": "Naylence Dev <naylencedev@gmail.com>",
   "license": "BUSL-1.1",
-  "licenseText": "See LICENSE file for terms",
   "keywords": [
     "naylence",
     "fame",
