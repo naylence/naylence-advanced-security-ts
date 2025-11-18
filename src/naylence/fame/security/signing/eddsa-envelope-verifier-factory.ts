@@ -12,6 +12,7 @@ import {
   type EdDSAEnvelopeVerifierOptions,
   type SigningConfigInstance,
 } from "./eddsa-envelope-verifier.js";
+import { TrustStoreProviderFactory } from "../cert/trust-store/trust-store-provider-factory.js";
 
 export interface EdDSAEnvelopeVerifierConfig extends EnvelopeVerifierConfig {
   readonly type: "EdDSAEnvelopeVerifier";
@@ -41,9 +42,15 @@ export class AdvancedEdDSAEnvelopeVerifierFactory extends EnvelopeVerifierFactor
       throw new Error("EdDSAEnvelopeVerifierFactory requires a key provider");
     }
 
+    let trustStoreProvider = options.trustStoreProvider ?? null;
+    if (!trustStoreProvider) {
+      trustStoreProvider = await TrustStoreProviderFactory.createTrustStoreProvider();
+    }
+
     const resolved: EdDSAEnvelopeVerifierOptions = {
       signingConfig:
         options.signingConfig ?? signingConfig ?? new SigningConfigClass(),
+      trustStoreProvider,
     };
 
     return new EdDSAEnvelopeVerifier(keyProvider, resolved);

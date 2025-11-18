@@ -1,56 +1,95 @@
+import { defineConfig } from 'rollup';
+import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
-import resolve from '@rollup/plugin-node-resolve';
-import { existsSync } from 'node:fs';
-import { resolve as resolvePath } from 'node:path';
 
-const esmEntry = resolvePath('dist/esm/index.js');
+const windowsDrivePath = /^[A-Za-z]:[\\/]/u;
 
-if (!existsSync(esmEntry)) {
-  throw new Error(
-    'Browser build requires dist/esm/index.js. Run "npm run build:esm" before bundling or use "npm run build".'
-  );
-}
+const markExternal = (id) => {
+  if (
+    id.startsWith('.') ||
+    id.startsWith('/') ||
+    id.startsWith('\0') ||
+    windowsDrivePath.test(id) ||
+    id.startsWith('dist/')
+  ) {
+    return false;
+  }
+  return true;
+};
 
-const externalPackages = new Set([
-  '@naylence/core',
-  '@naylence/factory',
-  '@naylence/runtime',
-  'naylence-runtime',
-  'naylence-runtime-ts',
-  'naylence-factory',
-  'naylence-factory-ts',
-  'naylence-core',
-  'naylence-core-ts',
-]);
-
-const externalPrefixes = [
-  '@naylence/core/',
-  '@naylence/factory/',
-  '@naylence/runtime/',
-  'naylence-runtime/',
-  'naylence-runtime-ts/',
+const browserPlugins = [
+  resolve({ browser: true, preferBuiltins: false }),
+  json(),
+  commonjs(),
 ];
 
-export default {
-  input: esmEntry,
-  output: {
-    file: 'dist/browser/index.js',
-    format: 'es',
-    sourcemap: true,
-    inlineDynamicImports: true,
+const nodePlugins = [
+  resolve({ preferBuiltins: true }),
+  json(),
+  commonjs(),
+];
+
+export default defineConfig([
+  {
+    input: 'dist/esm/browser.js',
+    output: [
+      {
+        file: 'dist/browser/index.mjs',
+        format: 'es',
+        sourcemap: false,
+        inlineDynamicImports: true,
+      },
+      {
+        file: 'dist/browser/index.cjs',
+        format: 'cjs',
+        sourcemap: false,
+        exports: 'named',
+        inlineDynamicImports: true,
+      },
+    ],
+    external: markExternal,
+    plugins: browserPlugins,
   },
-  plugins: [
-    resolve({
-      browser: true,
-      preferBuiltins: false,
-    }),
-    json(),
-    commonjs(),
-  ],
-  external: (id) =>
-    externalPackages.has(id) ||
-    externalPrefixes.some((prefix) => id.startsWith(prefix)) ||
-    id.startsWith('node:') ||
-    id.startsWith('zod'),
-};
+  {
+    input: 'dist/esm/index.js',
+    output: [
+      {
+        file: 'dist/node/index.mjs',
+        format: 'es',
+        sourcemap: false,
+        inlineDynamicImports: true,
+      },
+      {
+        file: 'dist/node/index.cjs',
+        format: 'cjs',
+        sourcemap: false,
+        exports: 'named',
+        inlineDynamicImports: true,
+      },
+    ],
+    external: markExternal,
+    plugins: nodePlugins,
+  },
+  {
+    input: 'dist/esm/node.js',
+    treeshake: false,
+    output: [
+      {
+        file: 'dist/node/node.mjs',
+        format: 'es',
+        sourcemap: false,
+        inlineDynamicImports: true,
+      },
+      {
+        file: 'dist/node/node.cjs',
+        format: 'cjs',
+        sourcemap: false,
+        exports: 'named',
+        inlineDynamicImports: true,
+      },
+    ],
+    external: markExternal,
+    plugins: nodePlugins,
+  },
+]);

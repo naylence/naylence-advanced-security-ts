@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * CA Server - Certificate Authority HTTP endpoint
  *
@@ -6,10 +5,13 @@
  * Mirrors the Python ca_server.py implementation.
  */
 
+import { sha256 } from "@noble/hashes/sha256.js";
 import Fastify from "fastify";
+import { realpathSync } from "node:fs";
+import { resolve } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { CAServiceFactory } from "./ca-service-factory.js";
-import type { CAService } from "./ca-types.js";
+import type { CAService, TrustBundleDocument } from "./ca-types.js";
 
 // Simple console logger for CA server
 const logger = {
@@ -132,6 +134,35 @@ function createCaRouter(
   fastify.get("/health", async () => {
     return { status: "healthy", service: "ca-server" };
   });
+
+  const trustBundlePath = "/.well-known/naylence/trust-bundle.json";
+
+  fastify.get(trustBundlePath, async (request, reply) => {
+    const bundle = await caService.getTrustBundle();
+    if (!bundle) {
+      return reply.status(404).send({
+        error: "trust_bundle_unavailable",
+      });
+    }
+
+    const payload = JSON.stringify(bundle);
+    const etag = `"${computeEtag(payload)}"`;
+    const requestEtag = request.headers["if-none-match"];
+
+    if (typeof requestEtag === "string" && requestEtag.replace(/W\//u, "") === etag.replace(/W\//u, "")) {
+      return reply
+        .status(304)
+        .header("ETag", etag)
+        .header("Cache-Control", trustBundleCacheControl())
+        .send();
+    }
+
+    return reply
+      .header("Content-Type", "application/json")
+      .header("Cache-Control", trustBundleCacheControl())
+      .header("ETag", etag)
+      .send(bundle satisfies TrustBundleDocument);
+  });
 }
 
 /**
@@ -184,23 +215,78 @@ async function main() {
   }
 }
 
-// Signal handlers
-process.on("SIGTERM", () => {
-  logger.info("ca_server_shutting_down", { signal: "SIGTERM" });
-  process.exit(0);
-});
+export { createApp, main };
 
-process.on("SIGINT", () => {
-  logger.info("ca_server_shutting_down", { signal: "SIGINT" });
-  process.exit(0);
-});
+const isTopLevelInvocation = (() => {
+  if (typeof process === "undefined") {
+    return false;
+  }
+  const entry = process.argv[1] ?? null;
+  if (!entry) {
+    if (process.env.FAME_CA_DEBUG === "1") {
+      console.log(
+        "[CA DEBUG] missing process argv entry",
+        JSON.stringify({ argv: process.argv }),
+      );
+    }
+    return false;
+  }
+  try {
+    const entryPath = resolveToRealPath(entry);
+    if (!entryPath) {
+      if (process.env.FAME_CA_DEBUG === "1") {
+        console.log(
+          "[CA DEBUG] failed to resolve entry path",
+          JSON.stringify({ entry }),
+        );
+      }
+      return false;
+    }
+    if (process.env.FAME_CA_DEBUG === "1") {
+      console.log(
+        "[CA DEBUG] invocation check",
+        JSON.stringify({
+          argv: process.argv,
+          entryPath,
+        }),
+      );
+    }
+    return /(?:^|[\\/])ca-server\.js$/u.test(entryPath);
+  } catch (error) {
+    if (process.env.FAME_CA_DEBUG === "1") {
+      console.log(
+        "[CA DEBUG] invocation check error",
+        JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+      );
+    }
+    return false;
+  }
+})();
 
-// Run if executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error("Fatal error:", error);
-    process.exit(1);
-  });
+if (isTopLevelInvocation) {
+  void main();
 }
 
-export { createApp };
+function computeEtag(payload: string): string {
+  const encoder = new TextEncoder();
+  const digest = sha256(encoder.encode(payload));
+  return Array.from(digest)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function trustBundleCacheControl(): string {
+  return "public, max-age=3600, stale-while-revalidate=86400";
+}
+
+function resolveToRealPath(pathLike: string): string | null {
+  try {
+    return realpathSync(pathLike);
+  } catch {
+    try {
+      return realpathSync.native?.(pathLike) ?? resolve(pathLike);
+    } catch {
+      return resolve(pathLike);
+    }
+  }
+}

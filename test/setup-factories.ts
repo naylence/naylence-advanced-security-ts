@@ -8,8 +8,16 @@
 import { registerRuntimeFactories } from "@naylence/runtime";
 import { registerAdvancedSecurityFactories } from "../src/naylence/fame/security/register-advanced-security-factories.js";
 
-// Register factories globally before all tests using beforeAll
-beforeAll(async () => {
+type TestLifecycle = (callback: () => unknown | Promise<unknown>) => unknown;
+
+const lifecycleHook = (globalThis as { beforeAll?: TestLifecycle }).beforeAll;
+
+if (typeof lifecycleHook !== "function") {
+	throw new Error("Test environment is missing a beforeAll hook");
+}
+
+// Register factories globally before all tests using the detected hook
+lifecycleHook(async () => {
   await registerRuntimeFactories();
   await registerAdvancedSecurityFactories();
 });

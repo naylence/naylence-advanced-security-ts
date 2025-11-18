@@ -4,12 +4,10 @@ import { AsnConvert } from "@peculiar/asn1-schema";
 import { GeneralName, SubjectAlternativeName } from "@peculiar/asn1-x509";
 import {
   CASigningService,
-  LOGICALS_OID,
-  NODE_ID_OID,
-  SID_OID,
   createTestCA,
 } from "../internal-ca-service.js";
 import { secureDigest } from "@naylence/runtime";
+import { LOGICALS_OID, NODE_ID_OID, SID_OID } from "../oid-constants.js";
 
 async function ensureWebCrypto(): Promise<void> {
   if (!globalThis.crypto || !globalThis.crypto.subtle) {

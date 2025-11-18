@@ -42,17 +42,13 @@ import {
   id_kp_serverAuth,
 } from "@peculiar/asn1-x509";
 import { CertificationRequest } from "@peculiar/asn1-csr";
-import { secureDigest, validateHostLogical } from "@naylence/runtime";
+import { secureDigest, validateHostLogical } from "@naylence/runtime/node";
 import type {
   CertificateIssuanceResponse,
   CertificateSigningRequest,
 } from "./ca-types.js";
 import { CAService } from "./ca-types.js";
-
-// Certificate extension OIDs (using placeholder PEN)
-export const SID_OID = "1.3.6.1.4.1.58530.1";
-export const LOGICALS_OID = "1.3.6.1.4.1.58530.2";
-export const NODE_ID_OID = "1.3.6.1.4.1.58530.4";
+import { LOGICALS_OID, NODE_ID_OID, SID_OID } from "./oid-constants.js";
 const ED25519_OID = "1.3.101.112";
 
 /**
@@ -108,7 +104,7 @@ async function ensureCrypto(): Promise<Crypto> {
       typeof process !== "undefined" &&
       typeof process.versions?.node === "string"
     ) {
-      cryptoPromise = import("crypto").then((cryptoModule) => {
+  cryptoPromise = import("node:crypto").then((cryptoModule) => {
         const webcrypto = (cryptoModule as unknown as { webcrypto?: Crypto })
           .webcrypto;
         if (!webcrypto || !webcrypto.subtle) {

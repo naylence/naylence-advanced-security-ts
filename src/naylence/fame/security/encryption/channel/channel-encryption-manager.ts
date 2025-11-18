@@ -94,25 +94,47 @@ function decodeBase64(encoded: string): Uint8Array {
   throw new Error("Base64 decoding not supported in this environment");
 }
 
-function randomBytes(length: number): Uint8Array {
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.getRandomValues === "function"
-  ) {
-    const buffer = new Uint8Array(length);
-    crypto.getRandomValues(buffer);
-    return buffer;
+type CryptoLike = Pick<Crypto, "getRandomValues">;
+
+let cachedCrypto: CryptoLike | null | undefined;
+
+function resolveCrypto(): CryptoLike | null {
+  if (cachedCrypto !== undefined) {
+    return cachedCrypto;
   }
 
-  try {
-    const { randomBytes: nodeRandomBytes } =
-      require("node:crypto") as typeof import("node:crypto");
-    return nodeRandomBytes(length);
-  } catch {
-    throw new Error(
-      "Crypto random bytes are not available in this environment",
-    );
+  cachedCrypto = null;
+
+  if (typeof globalThis !== "undefined") {
+    const scoped = globalThis as typeof globalThis & {
+      webcrypto?: CryptoLike;
+    };
+
+    const nativeCrypto = scoped.crypto;
+    if (nativeCrypto && typeof nativeCrypto.getRandomValues === "function") {
+      cachedCrypto = nativeCrypto;
+      return cachedCrypto;
+    }
+
+    const webcrypto = scoped.webcrypto;
+    if (webcrypto && typeof webcrypto.getRandomValues === "function") {
+      cachedCrypto = webcrypto;
+      return cachedCrypto;
+    }
   }
+
+  return cachedCrypto;
+}
+
+function randomBytes(length: number): Uint8Array {
+  const cryptoApi = resolveCrypto();
+  if (!cryptoApi) {
+    throw new Error("Secure random source is not available in this environment");
+  }
+
+  const buffer = new Uint8Array(length);
+  cryptoApi.getRandomValues(buffer);
+  return buffer;
 }
 
 function toFameAddress(

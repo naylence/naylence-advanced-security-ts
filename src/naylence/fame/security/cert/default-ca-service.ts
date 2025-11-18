@@ -5,10 +5,15 @@
  * loading from environment variables and test CA fallback.
  */
 
+import { sha256 } from "@noble/hashes/sha256.js";
+import { X509Certificate } from "@peculiar/x509";
+
 import type {
   Authorizer,
   CertificateIssuanceResponse,
   CertificateSigningRequest,
+  TrustBundleDocument,
+  TrustBundleRoot,
 } from "./ca-types.js";
 import { CAService } from "./ca-types.js";
 import { CASigningService, createTestCA } from "./internal-ca-service.js";
@@ -201,7 +206,7 @@ export class DefaultCAService extends CAService {
 
     // Node.js environment
     try {
-      const fs = await import("fs/promises");
+  const fs = await import("node:fs/promises");
       const stats = await fs.stat(filePath);
       if (stats.isFile()) {
         return await fs.readFile(filePath, "utf-8");
@@ -350,4 +355,128 @@ export class DefaultCAService extends CAService {
       throw error;
     }
   }
+
+  public override async getTrustBundle(): Promise<TrustBundleDocument | null> {
+    const credentials = await this.getCACredentials();
+
+    const rootCandidates: string[] = [];
+    if (credentials.rootCaCertPem) {
+      rootCandidates.push(credentials.rootCaCertPem);
+    }
+    if (credentials.signingCertPem) {
+      rootCandidates.push(credentials.signingCertPem);
+    }
+    if (credentials.intermediateChainPem) {
+      rootCandidates.push(...this.parseCertificateChain(credentials.intermediateChainPem));
+    }
+
+    if (rootCandidates.length === 0) {
+      return null;
+    }
+
+    const roots = buildTrustBundleRoots(rootCandidates);
+    if (roots.length === 0) {
+      return null;
+    }
+
+    const issuedAt = new Date().toISOString();
+    const validUntil = computeEarliestExpiry(roots);
+    const version = computeBundleVersion(roots);
+
+    return {
+      version,
+      issuedAt,
+      validUntil,
+      roots,
+    };
+  }
+}
+
+function normalizeCertificatePem(pem: string): string {
+  const trimmed = pem.trim();
+  return trimmed.endsWith("\n") ? trimmed : `${trimmed}\n`;
+}
+
+function analyseCertificate(pem: string): { notBefore?: string; notAfter?: string } {
+  try {
+    const cert = new X509Certificate(pem);
+    const details = cert as unknown as {
+      notBefore?: Date;
+      notAfter?: Date;
+    };
+
+    const notBefore =
+      details.notBefore instanceof Date
+        ? details.notBefore.toISOString()
+        : undefined;
+    const notAfter =
+      details.notAfter instanceof Date
+        ? details.notAfter.toISOString()
+        : undefined;
+
+    return {
+      notBefore,
+      notAfter,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function buildTrustBundleRoots(candidates: Iterable<string>): TrustBundleRoot[] {
+  const seen = new Set<string>();
+  const roots: TrustBundleRoot[] = [];
+
+  for (const candidate of candidates) {
+    if (!candidate) {
+      continue;
+    }
+
+    const normalized = normalizeCertificatePem(candidate);
+    if (seen.has(normalized)) {
+      continue;
+    }
+
+    seen.add(normalized);
+    const metadata = analyseCertificate(normalized);
+    roots.push({
+      pem: normalized,
+      ...metadata,
+    });
+  }
+
+  return roots;
+}
+
+function computeEarliestExpiry(roots: readonly TrustBundleRoot[]): string | null {
+  let earliest: number | null = null;
+
+  for (const root of roots) {
+    if (!root.notAfter) {
+      continue;
+    }
+
+    const timestamp = Date.parse(root.notAfter);
+    if (Number.isNaN(timestamp)) {
+      continue;
+    }
+
+    if (earliest === null || timestamp < earliest) {
+      earliest = timestamp;
+    }
+  }
+
+  return earliest === null ? null : new Date(earliest).toISOString();
+}
+
+function computeBundleVersion(roots: readonly TrustBundleRoot[]): number {
+  const encoder = new TextEncoder();
+  const serialized = roots.map((root) => root.pem).join("\n");
+  const digest = sha256(encoder.encode(serialized));
+  const hex = Array.from(digest)
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  const versionHex = hex.slice(0, 12);
+  const value = Number.parseInt(versionHex, 16);
+  return Number.isNaN(value) ? 1 : Math.max(1, value);
 }

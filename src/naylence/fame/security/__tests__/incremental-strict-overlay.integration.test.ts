@@ -15,8 +15,6 @@ import {
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 
 import {
-  DefaultHttpServer,
-  getWebsocketListenerInstance,
   NodeFactory,
   type FameNode,
   SentinelFactory,
@@ -31,6 +29,11 @@ import {
   LogLevel,
   basicConfig,
 } from "@naylence/runtime";
+
+import {
+  DefaultHttpServer,
+  getWebsocketListenerInstance,
+} from "@naylence/runtime/node";
 
 import {
   setupTestCACredentials,
@@ -114,12 +117,22 @@ async function waitForKeysForPath(
 }
 
 describe("Incremental strict-overlay security integration", () => {
-  beforeAll(() => {
-    basicConfig({ level: LogLevel.DEBUG });
+  let suiteCaCredentials: TestCACredentials | null = null;
+
+  beforeAll(async () => {
+    basicConfig({ level: LogLevel.ERROR });
+    suiteCaCredentials = await setupTestCACredentials();
   });
 
   afterEach(async () => {
     await DefaultHttpServer.shutdownAll();
+  });
+
+  afterAll(async () => {
+    if (suiteCaCredentials) {
+      await suiteCaCredentials.cleanup();
+      suiteCaCredentials = null;
+    }
   });
 
   test("Step 1: Working baseline - NoopAuthorizer with overlay security", async () => {
@@ -688,38 +701,22 @@ describe("Incremental strict-overlay security integration", () => {
   });
 
   test("Step 4: Use SecurityProfile strict-overlay (X.509 certificates)", async () => {
-    // NOTE: Certificate infrastructure is ported and working correctly:
-    // - Certificates successfully load from environment variables
-    // - Certificate material applied to crypto provider
-    // - nodeJwk() adds x5c field correctly
-    //
-    // CORE ISSUE: Envelopes are NOT being signed despite having valid crypto provider
-    // - Child sends AddressBind frame (physical address binding, happens even without logicals)
-    // - Frame arrives at parent UNSIGNED
-    // - Parent rejects with "unsigned_envelope_violation" (correct per strict-overlay policy)
-    //
-    // This confirms the issue is in runtime's envelope signing flow, NOT in advanced-security.
-    // The strict-overlay profile specifies default_signing: true and signing_material: "x509-chain",
-    // but the outbound frames are not being signed before transmission.
-    //
-    // TODO: Runtime team needs to debug why DefaultSecurityManager isn't signing outbound
-    // frames when using strict-overlay profile with x509-chain signing material.
     const sentinelFactory = new SentinelFactory();
     const nodeFactory = new NodeFactory();
 
     let parent: Sentinel | null = null;
     let child: FameNode | null = null;
     let jwksServer: http.Server | null = null;
-    let caCredentials: TestCACredentials | null = null;
 
     try {
       const issuer = "https://step4.integration";
       const sentinelId = "step4-sentinel";
       const childId = "step4-client";
 
-      // Set up test CA credentials for certificate-based signing
-      // NOTE: This uses a placeholder certificate until full CA signing is implemented
-      caCredentials = await setupTestCACredentials();
+      const caCredentials = suiteCaCredentials;
+      if (!caCredentials) {
+        throw new Error("Test CA credentials were not initialized");
+      }
 
       const { publicKey, privateKey } = await generateKeyPair("RS256");
       const jwk = await exportJWK(publicKey);
@@ -761,6 +758,7 @@ describe("Incremental strict-overlay security integration", () => {
           FAME_JWT_TRUSTED_ISSUER: issuer,
           FAME_JWKS_URL: jwksUrl,
           FAME_DEFAULT_ENCRYPTION_LEVEL: "plaintext", // Keep plaintext for now
+          FAME_CA_SERVICE_URL: caCredentials.caServiceUrl,
         },
         security: {
           type: "SecurityProfile",
@@ -830,6 +828,7 @@ describe("Incremental strict-overlay security integration", () => {
           FAME_JWT_TRUSTED_ISSUER: issuer,
           FAME_JWKS_URL: jwksUrl,
           FAME_DEFAULT_ENCRYPTION_LEVEL: "plaintext",
+          FAME_CA_SERVICE_URL: caCredentials.caServiceUrl,
         },
         security: {
           type: "SecurityProfile",
@@ -887,7 +886,6 @@ describe("Incremental strict-overlay security integration", () => {
       }
 
       // 3. Clean up other resources
-      caCredentials?.cleanup();
       if (jwksServer) {
         await new Promise<void>((resolve) =>
           jwksServer!.close(() => resolve()),
@@ -910,6 +908,10 @@ describe("Incremental strict-overlay security integration", () => {
       const issuer = "https://step5.integration";
       const sentinelId = "step5-sentinel";
       const childId = "step5-client";
+      const caCredentials = suiteCaCredentials;
+      if (!caCredentials) {
+        throw new Error("Test CA credentials were not initialized");
+      }
 
       const { publicKey, privateKey } = await generateKeyPair("RS256");
       const jwk = await exportJWK(publicKey);
@@ -945,6 +947,7 @@ describe("Incremental strict-overlay security integration", () => {
           FAME_JWT_TRUSTED_ISSUER: issuer,
           FAME_JWKS_URL: jwksUrl,
           FAME_DEFAULT_ENCRYPTION_LEVEL: "channel", // NOW ENABLE CHANNEL ENCRYPTION
+          FAME_CA_SERVICE_URL: caCredentials.caServiceUrl,
         },
         security: {
           type: "SecurityProfile",
@@ -1009,6 +1012,7 @@ describe("Incremental strict-overlay security integration", () => {
           FAME_JWT_TRUSTED_ISSUER: issuer,
           FAME_JWKS_URL: jwksUrl,
           FAME_DEFAULT_ENCRYPTION_LEVEL: "channel",
+          FAME_CA_SERVICE_URL: caCredentials.caServiceUrl,
         },
         security: {
           type: "SecurityProfile",
@@ -1067,7 +1071,7 @@ describe("Incremental strict-overlay security integration", () => {
 
       // Track encryption by checking security handler logs
       let encryptionApplied = false;
-      const originalLog = console.log;
+      basicConfig({ level: LogLevel.DEBUG });
       const logSpy = jest
         .spyOn(console, "log")
         .mockImplementation((message) => {
@@ -1078,7 +1082,6 @@ describe("Incremental strict-overlay security integration", () => {
           ) {
             encryptionApplied = true;
           }
-          originalLog.call(console, message);
         });
 
       await child.send(testEnvelope);
@@ -1091,6 +1094,8 @@ describe("Incremental strict-overlay security integration", () => {
       // Verify that channel encryption was applied to the Data frame
       expect(encryptionApplied).toBe(true);
     } finally {
+      basicConfig({ level: LogLevel.ERROR });
+
       if (child) {
         await child.stop();
         await new Promise((resolve) => setTimeout(resolve, 1200));
@@ -1124,6 +1129,10 @@ describe("Incremental strict-overlay security integration", () => {
       const issuer = "https://step6.integration";
       const sentinelId = "step6-sentinel";
       const childId = "step6-client";
+      const caCredentials = suiteCaCredentials;
+      if (!caCredentials) {
+        throw new Error("Test CA credentials were not initialized");
+      }
 
       const { publicKey, privateKey } = await generateKeyPair("RS256");
       const jwk = await exportJWK(publicKey);
@@ -1160,6 +1169,7 @@ describe("Incremental strict-overlay security integration", () => {
           FAME_JWKS_URL: jwksUrl,
           FAME_DEFAULT_ENCRYPTION_LEVEL: "sealed", // ENABLE SEALED ENCRYPTION
           FAME_SHOW_ENVELOPES: "true",
+          FAME_CA_SERVICE_URL: caCredentials.caServiceUrl,
         },
         security: {
           type: "SecurityProfile",
@@ -1224,6 +1234,7 @@ describe("Incremental strict-overlay security integration", () => {
           FAME_JWT_TRUSTED_ISSUER: issuer,
           FAME_JWKS_URL: jwksUrl,
           FAME_DEFAULT_ENCRYPTION_LEVEL: "sealed",
+          FAME_CA_SERVICE_URL: caCredentials.caServiceUrl,
         },
         security: {
           type: "SecurityProfile",
@@ -1282,7 +1293,7 @@ describe("Incremental strict-overlay security integration", () => {
 
       // Track encryption by checking security handler logs
       let encryptionApplied = false;
-      const originalLog = console.log;
+      basicConfig({ level: LogLevel.DEBUG });
       const logSpy = jest
         .spyOn(console, "log")
         .mockImplementation((message) => {
@@ -1299,7 +1310,6 @@ describe("Incremental strict-overlay security integration", () => {
               encryptionApplied = false;
             }
           }
-          originalLog.call(console, message);
         });
 
       await child.send(testEnvelope);
@@ -1312,6 +1322,8 @@ describe("Incremental strict-overlay security integration", () => {
       // Verify that sealed encryption was applied to the Data frame
       expect(encryptionApplied).toBe(true);
     } finally {
+      basicConfig({ level: LogLevel.ERROR });
+
       if (child) {
         await child.stop();
       }

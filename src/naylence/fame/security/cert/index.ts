@@ -7,6 +7,15 @@ export {
 } from "./util.js";
 export { GRANT_PURPOSE_CA_SIGN } from "./grants.js";
 export {
+  createEd25519CsrFromPem,
+  type CreateEd25519CsrFromPemOptions,
+} from "./node-ed25519-csr.js";
+export {
+  createEd25519Csr,
+  type CreateEd25519CsrOptions,
+} from "./browser-csr.js";
+export { type CreatedEd25519Csr } from "./csr-types.js";
+export {
   DefaultCertificateManager,
   type DefaultCertificateManagerOptions,
   type SigningConfigInstance as DefaultCertificateManagerSigningConfigInstance,
@@ -16,6 +25,24 @@ export {
   FACTORY_META as DEFAULT_CERTIFICATE_MANAGER_FACTORY_META,
   type DefaultCertificateManagerConfig,
 } from "./default-certificate-manager-factory.js";
+export type { TrustStoreProvider } from "./trust-store/trust-store-provider.js";
+export {
+  TrustStoreProviderFactory,
+  NullTrustStoreProvider,
+  TRUST_STORE_PROVIDER_FACTORY_BASE_TYPE,
+  type TrustStoreProviderConfig,
+  type TrustStoreProviderDependencies,
+} from "./trust-store/trust-store-provider-factory.js";
+export {
+  EnvTrustStoreProviderFactory,
+  FACTORY_META as ENV_TRUST_STORE_PROVIDER_FACTORY_META,
+  type EnvTrustStoreProviderConfig,
+} from "./trust-store/node-trust-store-provider-factory.js";
+export {
+  BrowserTrustStoreProviderFactory,
+  FACTORY_META as BROWSER_TRUST_STORE_PROVIDER_FACTORY_META,
+  type BrowserTrustStoreProviderConfig,
+} from "./trust-store/browser-trust-store-provider-factory.js";
 
 // Certificate Authority (CA) types and services
 export {
@@ -37,9 +64,6 @@ export {
 export {
   CASigningService,
   type CASigningServiceOptions,
-  SID_OID,
-  LOGICALS_OID,
-  NODE_ID_OID,
   createTestCA,
   extractSpiffeIdFromCert,
   extractSidFromCert,
@@ -48,6 +72,7 @@ export {
   extractSidFromSpiffeId,
   verifyCertSidIntegrity,
 } from "./internal-ca-service.js";
+export { SID_OID, LOGICALS_OID, NODE_ID_OID } from "./oid-constants.js";
 export {
   DefaultCAService,
   type DefaultCAServiceOptions,

@@ -8,6 +8,8 @@
 export const MODULES = [
   "./security/cert/default-ca-service-factory.js",
   "./security/cert/default-certificate-manager-factory.js",
+  "./security/cert/trust-store/browser-trust-store-provider-factory.js",
+  "./security/cert/trust-store/node-trust-store-provider-factory.js",
   "./security/encryption/channel/channel-encryption-manager-factory.js",
   "./security/encryption/composite-encryption-manager-factory.js",
   "./security/encryption/default-secure-channel-manager-factory.js",
@@ -21,3 +23,21 @@ export const MODULES = [
 ] as const;
 
 export type FactoryModuleSpec = (typeof MODULES)[number];
+export type FactoryModuleLoader = () => Promise<Record<string, unknown>>;
+
+export const MODULE_LOADERS: Record<FactoryModuleSpec, FactoryModuleLoader> = {
+  "./security/cert/default-ca-service-factory.js": () => import("./security/cert/default-ca-service-factory.js"),
+  "./security/cert/default-certificate-manager-factory.js": () => import("./security/cert/default-certificate-manager-factory.js"),
+  "./security/cert/trust-store/browser-trust-store-provider-factory.js": () => import("./security/cert/trust-store/browser-trust-store-provider-factory.js"),
+  "./security/cert/trust-store/node-trust-store-provider-factory.js": () => import("./security/cert/trust-store/node-trust-store-provider-factory.js"),
+  "./security/encryption/channel/channel-encryption-manager-factory.js": () => import("./security/encryption/channel/channel-encryption-manager-factory.js"),
+  "./security/encryption/composite-encryption-manager-factory.js": () => import("./security/encryption/composite-encryption-manager-factory.js"),
+  "./security/encryption/default-secure-channel-manager-factory.js": () => import("./security/encryption/default-secure-channel-manager-factory.js"),
+  "./security/encryption/sealed/x25519-encryption-manager-factory.js": () => import("./security/encryption/sealed/x25519-encryption-manager-factory.js"),
+  "./security/keys/x5c-key-manager-factory.js": () => import("./security/keys/x5c-key-manager-factory.js"),
+  "./security/signing/eddsa-envelope-signer-factory.js": () => import("./security/signing/eddsa-envelope-signer-factory.js"),
+  "./security/signing/eddsa-envelope-verifier-factory.js": () => import("./security/signing/eddsa-envelope-verifier-factory.js"),
+  "./stickiness/aft-load-balancer-stickiness-manager-factory.js": () => import("./stickiness/aft-load-balancer-stickiness-manager-factory.js"),
+  "./stickiness/aft-replica-stickiness-manager-factory.js": () => import("./stickiness/aft-replica-stickiness-manager-factory.js"),
+  "./welcome/advanced-welcome-service-factory.js": () => import("./welcome/advanced-welcome-service-factory.js"),
+};
