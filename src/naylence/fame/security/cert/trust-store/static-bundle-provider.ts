@@ -1,3 +1,4 @@
+import type { TrustAnchor, TrustStoreProvider } from "@naylence/runtime";
 import {
   anchorsToPem,
   normalizePem,
@@ -5,7 +6,6 @@ import {
   withComputedSpki,
   dataUriToPem,
 } from "./anchor-utils.js";
-import type { TrustAnchor, TrustStoreProvider } from "./trust-store-provider.js";
 
 export interface StaticBundleProviderOptions {
   readonly label?: string;

@@ -1,11 +1,3 @@
-import { HttpBundleProvider } from "./http-bundle-provider.js";
-import { parseFameCaCerts } from "./fame-ca-certs-parser.js";
-import { anchorsToPem, pemChainToAnchors } from "./anchor-utils.js";
-import {
-  createProviderFromDataUri,
-  createProviderFromPem,
-  loadPemFromFile,
-} from "./static-bundle-provider.js";
 import type {
   DataPemSource,
   FilePemSource,
@@ -14,7 +6,15 @@ import type {
   TrustBundleSource,
   TrustAnchor,
   TrustStoreProvider,
-} from "./trust-store-provider.js";
+} from "@naylence/runtime";
+import { HttpBundleProvider } from "./http-bundle-provider.js";
+import { parseFameCaCerts } from "./fame-ca-certs-parser.js";
+import { anchorsToPem, pemChainToAnchors } from "./anchor-utils.js";
+import {
+  createProviderFromDataUri,
+  createProviderFromPem,
+  loadPemFromFile,
+} from "./static-bundle-provider.js";
 
 export interface CreateTrustStoreProviderOptions {
   readonly env?: Record<string, unknown> | null;
