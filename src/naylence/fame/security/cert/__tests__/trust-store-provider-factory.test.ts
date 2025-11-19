@@ -4,13 +4,13 @@ import {
   SigningConfigClass,
   type KeyProvider,
   secureDigest,
+  TrustStoreProviderFactory,
 } from "@naylence/runtime";
 import { canonicalJson } from "@naylence/runtime/naylence/fame/security/signing/eddsa-signer-verifier.js";
 
 import type { TrustStoreProvider } from "../../cert/trust-store/trust-store-provider.js";
 import { EdDSAEnvelopeVerifier } from "../../signing/eddsa-envelope-verifier.js";
 import { AdvancedEdDSAEnvelopeVerifierFactory } from "../../signing/eddsa-envelope-verifier-factory.js";
-import { TrustStoreProviderFactory } from "../../cert/trust-store/trust-store-provider-factory.js";
 
 const SAMPLE_PEM = `-----BEGIN CERTIFICATE-----
 MIIBnzCCAUGgAwIBAgIJAL0fakepemMAoGCCqGSM49BAMCMBMxETAPBgNVBAMM

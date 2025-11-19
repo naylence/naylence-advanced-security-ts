@@ -3,6 +3,7 @@ import {
   ENVELOPE_VERIFIER_FACTORY_BASE_TYPE,
   EnvelopeVerifierFactory,
   SigningConfigClass,
+  TrustStoreProviderFactory,
   type EnvelopeVerifierConfig,
   type KeyProvider,
 } from "@naylence/runtime";
@@ -12,7 +13,6 @@ import {
   type EdDSAEnvelopeVerifierOptions,
   type SigningConfigInstance,
 } from "./eddsa-envelope-verifier.js";
-import { TrustStoreProviderFactory } from "../cert/trust-store/trust-store-provider-factory.js";
 
 export interface EdDSAEnvelopeVerifierConfig extends EnvelopeVerifierConfig {
   readonly type: "EdDSAEnvelopeVerifier";
@@ -36,11 +36,14 @@ export class AdvancedEdDSAEnvelopeVerifierFactory extends EnvelopeVerifierFactor
     _config?: EdDSAEnvelopeVerifierConfig | Record<string, unknown> | null,
     keyProvider?: KeyProvider | null,
     signingConfig?: SigningConfig | null,
-    options: EdDSAEnvelopeVerifierOptions = {},
+    ...factoryArgs: unknown[]
   ): Promise<EnvelopeVerifier> {
     if (!keyProvider) {
       throw new Error("EdDSAEnvelopeVerifierFactory requires a key provider");
     }
+
+    // Extract options from factoryArgs (third parameter after keyProvider and signingConfig)
+    const options = (factoryArgs[0] as EdDSAEnvelopeVerifierOptions | undefined) ?? {};
 
     let trustStoreProvider = options.trustStoreProvider ?? null;
     if (!trustStoreProvider) {

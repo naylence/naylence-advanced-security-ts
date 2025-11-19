@@ -1,13 +1,13 @@
-import { HttpBundleProvider } from "./http-bundle-provider.js";
-import { createTrustStoreProviderFromEnv } from "./env-provider.js";
-import type { HttpBundleProviderOptions } from "./http-bundle-provider.js";
-import type { TrustStoreProvider } from "./trust-store-provider.js";
 import {
   TRUST_STORE_PROVIDER_FACTORY_BASE_TYPE,
   TrustStoreProviderFactory,
+  type TrustStoreProvider,
   type TrustStoreProviderConfig,
   type TrustStoreProviderDependencies,
-} from "./trust-store-provider-factory.js";
+} from "@naylence/runtime";
+import { HttpBundleProvider } from "./http-bundle-provider.js";
+import { createTrustStoreProviderFromEnv } from "./env-provider.js";
+import type { HttpBundleProviderOptions } from "./http-bundle-provider.js";
 
 export interface BrowserTrustStoreProviderConfig extends TrustStoreProviderConfig {
   readonly type: "BrowserTrustStoreProvider";

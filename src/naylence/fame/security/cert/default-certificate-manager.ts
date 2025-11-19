@@ -19,7 +19,6 @@ import { CertificateRequestError } from "./ca-types.js";
 import { GRANT_PURPOSE_CA_SIGN } from "./grants.js";
 import { validateJwkX5cCertificate } from "./util.js";
 import { createEd25519CsrFromPem } from "./node-ed25519-csr.js";
-import { TrustStoreProviderFactory } from "./trust-store/trust-store-provider-factory.js";
 
 const logger = getLogger(
   "naylence.fame.security.cert.default_certificate_manager",
@@ -809,10 +808,9 @@ export class DefaultCertificateManager implements CertificateManager {
       }
     }
 
-    const envPem = await resolveTrustStorePemFromEnvironment();
     return {
-      pem: envPem,
-      reason: envPem ? undefined : "trust_store_provider_unconfigured",
+      pem: null,
+      reason: "trust_store_provider_unconfigured",
     };
   }
 
@@ -1194,23 +1192,6 @@ function normalizeAuthConfig(
   }
 
   return normalized;
-}
-
-async function resolveTrustStorePemFromEnvironment(): Promise<string | null> {
-  try {
-    const provider = await TrustStoreProviderFactory.createTrustStoreProvider();
-    if (typeof provider.initialize === "function") {
-      await provider.initialize();
-    }
-    const pem = await provider.getTrustStorePem();
-    return normalizePemOrNull(pem);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.debug("trust_store_provider_resolution_failed", {
-      error: message,
-    });
-    return null;
-  }
 }
 
 export default DefaultCertificateManager;

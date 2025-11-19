@@ -92,6 +92,7 @@ function normalizeOptions(
   config: DefaultCertificateManagerConfig,
   securitySettings: SecuritySettings | null,
   signing: SigningConfigInstance | null,
+  trustStorePem: (() => Promise<string | null>) | null,
 ): DefaultCertificateManagerOptions {
   const caServiceUrl = config.caServiceUrl ?? config.ca_service_url ?? null;
   const cryptoProvider =
@@ -102,6 +103,7 @@ function normalizeOptions(
     signing,
     caServiceUrl,
     cryptoProvider,
+    trustStorePem,
   };
 }
 
@@ -114,7 +116,7 @@ export class DefaultCertificateManagerFactory extends CertificateManagerFactory<
     config?: DefaultCertificateManagerConfig | Record<string, unknown> | null,
     securitySettings?: SecuritySettings | null,
     signing?: SigningConfig | null,
-    ..._factoryArgs: unknown[]
+    ...factoryArgs: unknown[]
   ): Promise<CertificateManager> {
     const normalizedConfig = normalizeConfig(config);
     const resolvedSecuritySettings = normalizeSecuritySettings(
@@ -122,10 +124,15 @@ export class DefaultCertificateManagerFactory extends CertificateManagerFactory<
       securitySettings ?? null,
     );
     const resolvedSigning = normalizeSigning(normalizedConfig, signing ?? null);
+    
+    // Extract trust store PEM resolver from factoryArgs if provided
+    const trustStorePemResolver = factoryArgs[0] as (() => Promise<string | null>) | undefined;
+    
     const options = normalizeOptions(
       normalizedConfig,
       resolvedSecuritySettings,
       resolvedSigning,
+      trustStorePemResolver ?? null,
     );
 
     return new DefaultCertificateManager(options);

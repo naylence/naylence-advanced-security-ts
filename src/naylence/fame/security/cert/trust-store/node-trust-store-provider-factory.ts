@@ -1,10 +1,10 @@
-import type { TrustStoreProvider } from "./trust-store-provider.js";
 import {
   TRUST_STORE_PROVIDER_FACTORY_BASE_TYPE,
   TrustStoreProviderFactory,
+  type TrustStoreProvider,
   type TrustStoreProviderConfig,
   type TrustStoreProviderDependencies,
-} from "./trust-store-provider-factory.js";
+} from "@naylence/runtime";
 import { createTrustStoreProviderFromEnv } from "./env-provider.js";
 
 export interface EnvTrustStoreProviderConfig extends TrustStoreProviderConfig {

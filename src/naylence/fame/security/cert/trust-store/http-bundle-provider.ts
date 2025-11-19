@@ -1,5 +1,10 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { getLogger } from "@naylence/runtime";
+import type {
+  TrustAnchor,
+  TrustStoreProvider,
+  TrustBundlePins,
+} from "@naylence/runtime";
 
 import {
   anchorsToPem,
@@ -9,11 +14,6 @@ import {
   toBase64Url,
   withComputedSpki,
 } from "./anchor-utils.js";
-import type {
-  TrustAnchor,
-  TrustStoreProvider,
-  TrustBundlePins,
-} from "./trust-store-provider.js";
 
 interface CachedBundleEntry {
   anchors: TrustAnchor[];
