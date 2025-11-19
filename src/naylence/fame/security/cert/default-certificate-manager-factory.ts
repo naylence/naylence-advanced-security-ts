@@ -1,18 +1,18 @@
 import type { SecuritySettings } from "@naylence/core";
-import { SigningConfigClass } from "@naylence/runtime/node";
 import {
+  SigningConfigClass,
   CertificateManagerFactory,
   CERTIFICATE_MANAGER_FACTORY_BASE_TYPE,
   type CertificateManagerConfig,
-} from "@naylence/runtime/node";
+  type SigningConfig,
+  type CertificateManager,
+} from "@naylence/runtime";
 
 import {
   DefaultCertificateManager,
   type DefaultCertificateManagerOptions,
   type SigningConfigInstance,
 } from "./default-certificate-manager.js";
-import type { SigningConfig } from "@naylence/runtime";
-import type { CertificateManager } from "@naylence/runtime";
 
 export interface DefaultCertificateManagerConfig
   extends CertificateManagerConfig {

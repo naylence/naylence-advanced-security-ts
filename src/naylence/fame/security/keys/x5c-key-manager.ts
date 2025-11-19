@@ -97,7 +97,7 @@ export class X5CKeyManager extends TaskSpawner implements KeyManager {
 
   public async onNodeStopped(node: NodeLike): Promise<void> {
     logger.debug("x5c_key_manager_stopping");
-    await this.shutdownTasks({ gracePeriod: 500, joinTimeout: 500 });
+    await this.shutdownTasks({ gracePeriod: 50, joinTimeout: 100 });
     this.purgeTask = null;
     await this.inner.onNodeStopped(node);
     logger.debug("x5c_key_manager_stopped");

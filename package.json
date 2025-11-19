@@ -28,14 +28,14 @@
   "exports": {
     ".": {
       "types": "./dist/types/index.d.ts",
-      "import": {
-        "browser": "./dist/browser/index.mjs",
-        "default": "./dist/node/node.mjs"
+      "browser": {
+        "import": "./dist/browser/index.mjs",
+        "require": "./dist/browser/index.cjs",
+        "default": "./dist/browser/index.mjs"
       },
-      "require": {
-        "browser": "./dist/browser/index.cjs",
-        "default": "./dist/node/node.cjs"
-      }
+      "import": "./dist/node/node.mjs",
+      "require": "./dist/node/node.cjs",
+      "default": "./dist/node/node.mjs"
     },
     "./node": {
       "types": "./dist/types/node.d.ts",
@@ -142,7 +142,7 @@
     "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
-    "@naylence/runtime": "^0.3.5-test.918",
+    "@naylence/runtime": "^0.3.5-test.923",
     "@noble/ciphers": "^2.0.1",
     "@noble/curves": "^1.4.0",
     "@noble/ed25519": "^2.1.0",

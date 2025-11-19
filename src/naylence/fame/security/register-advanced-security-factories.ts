@@ -233,10 +233,10 @@ function shouldSkipModule(spec: FactoryModuleSpec): boolean {
   }
 
   if (!browserSkippedModules.has(spec)) {
-    console.warn(
-      "[advanced-security:factory-manifest] skipped browser-incompatible module",
-      spec,
-    );
+    // console.warn(
+    //   "[advanced-security:factory-manifest] skipped browser-incompatible module",
+    //   spec,
+    // );
     browserSkippedModules.add(spec);
   }
 
@@ -311,7 +311,7 @@ async function registerModule(
     const extraMetadata =
       Object.keys(metadata).length > 0 ? metadata : undefined;
 
-    console.log("[debug] registering module", { spec, base, key, metadata: extraMetadata });
+    // console.log("[debug] registering module", { spec, base, key, metadata: extraMetadata });
     registrar.registerFactory(base, key, Ctor, extraMetadata);
     return true;
   };
