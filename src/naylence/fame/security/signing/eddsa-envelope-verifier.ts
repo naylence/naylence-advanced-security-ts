@@ -6,15 +6,14 @@ import {
   SigningConfigClass,
   secureDigest,
   type KeyProvider,
-} from "@naylence/runtime";
-import {
   canonicalJson,
   decodeBase64Url,
   frameDigest,
   immutableHeaders,
-} from "@naylence/runtime/naylence/fame/security/signing/eddsa-signer-verifier.js";
-import { encodeUtf8 } from "@naylence/runtime/naylence/fame/security/signing/eddsa-utils.js";
-import { JWKValidationError, validateSigningKey } from "@naylence/runtime";
+  encodeUtf8,
+  JWKValidationError,
+  validateSigningKey,
+} from "@naylence/runtime";
 import { publicKeyFromX5c } from "../cert/util.js";
 import type { TrustStoreProvider } from "../cert/trust-store/trust-store-provider.js";
 

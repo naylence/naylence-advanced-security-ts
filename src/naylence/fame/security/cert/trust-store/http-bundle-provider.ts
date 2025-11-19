@@ -1,4 +1,5 @@
 import { sha256 } from "@noble/hashes/sha2.js";
+import { getLogger } from "@naylence/runtime";
 
 import {
   anchorsToPem,
@@ -32,16 +33,7 @@ export interface HttpBundleProviderOptions extends TrustBundlePins {
 const DEFAULT_REFRESH_INTERVAL_MS = 86_400_000; // 24 hours
 const MIN_REFRESH_INTERVAL_MS = 60_000; // 1 minute
 
-const consoleLogger = {
-  debug: (...args: unknown[]): void => {
-    if (!isProductionEnvironment()) {
-      console.debug("[trust-bundle]", ...args);
-    }
-  },
-  warn: (...args: unknown[]): void => {
-    console.warn("[trust-bundle]", ...args);
-  },
-};
+const logger = getLogger("naylence.fame.security.cert.trust_store.http_bundle_provider");
 
 function isTruthyFlag(value: unknown): boolean {
   if (typeof value === "boolean") {
@@ -123,7 +115,7 @@ export class HttpBundleProvider implements TrustStoreProvider {
         );
       }
 
-      consoleLogger.warn("Allowing insecure trust bundle URL", {
+      logger.warning("allowing_insecure_trust_bundle_url", {
         url: parsed.toString(),
         devMode,
         isLoopbackHost,
@@ -164,7 +156,9 @@ export class HttpBundleProvider implements TrustStoreProvider {
     if (stale || !this.anchors) {
       this.inflight = this.fetchLatest()
         .catch((error) => {
-          consoleLogger.warn("Trust bundle refresh failed", error);
+          logger.warning("trust_bundle_refresh_failed", {
+            error: error instanceof Error ? error.message : String(error),
+          });
           if (this.anchors) {
             return this.anchors;
           }
@@ -211,13 +205,15 @@ export class HttpBundleProvider implements TrustStoreProvider {
       const cached = await loadCache(this.cacheKey);
       if (cached) {
         this.applyCachedEntry(cached);
-        consoleLogger.debug("Loaded trust bundle from cache", {
+        logger.debug("loaded_trust_bundle_from_cache", {
           url: this.url.href,
           anchorCount: cached.anchors.length,
         });
       }
     } catch (error) {
-      consoleLogger.warn("Failed to load cached trust bundle", error);
+      logger.warning("failed_to_load_cached_trust_bundle", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
     this.initialized = true;
   }
@@ -318,7 +314,9 @@ export class HttpBundleProvider implements TrustStoreProvider {
       try {
         callback();
       } catch (error) {
-        consoleLogger.warn("Trust bundle listener failed", error);
+        logger.warning("trust_bundle_listener_failed", {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
   }
@@ -633,7 +631,9 @@ async function openIndexedDbStore(): Promise<BrowserStore | null> {
     };
 
     request.onerror = () => {
-      consoleLogger.warn("IndexedDB unavailable for trust bundle caching", request.error);
+      logger.warning("indexeddb_unavailable_for_trust_bundle_caching", {
+        error: request.error ? String(request.error) : "unknown",
+      });
       resolve(null);
     };
   });

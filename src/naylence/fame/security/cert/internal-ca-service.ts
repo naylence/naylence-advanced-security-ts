@@ -42,7 +42,7 @@ import {
   id_kp_serverAuth,
 } from "@peculiar/asn1-x509";
 import { CertificationRequest } from "@peculiar/asn1-csr";
-import { secureDigest, validateHostLogical } from "@naylence/runtime/node";
+import { secureDigest, validateHostLogical } from "@naylence/runtime";
 import type {
   CertificateIssuanceResponse,
   CertificateSigningRequest,
