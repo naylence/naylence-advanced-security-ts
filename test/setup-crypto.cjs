@@ -1,6 +1,10 @@
 const { webcrypto } = require('node:crypto');
 const { TextDecoder, TextEncoder } = require('util');
 
+if (typeof process === 'undefined') {
+  globalThis.process = require('process');
+}
+
 if (typeof globalThis.crypto === 'undefined') {
   Object.defineProperty(globalThis, 'crypto', {
     value: webcrypto,
