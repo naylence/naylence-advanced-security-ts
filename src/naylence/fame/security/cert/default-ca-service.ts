@@ -379,7 +379,7 @@ export class DefaultCAService extends CAService {
       return null;
     }
 
-    const issuedAt = new Date().toISOString();
+    const issuedAt = computeEarliestIssuance(roots);
     const validUntil = computeEarliestExpiry(roots);
     const version = computeBundleVersion(roots);
 
@@ -446,6 +446,33 @@ function buildTrustBundleRoots(candidates: Iterable<string>): TrustBundleRoot[] 
   }
 
   return roots;
+}
+
+function computeEarliestIssuance(roots: readonly TrustBundleRoot[]): string {
+  let earliest: number | null = null;
+
+  for (const root of roots) {
+    if (!root.notBefore) {
+      continue;
+    }
+
+    const timestamp = Date.parse(root.notBefore);
+    if (Number.isNaN(timestamp)) {
+      continue;
+    }
+
+    if (earliest === null || timestamp < earliest) {
+      earliest = timestamp;
+    }
+  }
+
+  // If no notBefore found, use earliest expiry as fallback, or current time
+  if (earliest === null) {
+    const earliestExpiry = computeEarliestExpiry(roots);
+    return earliestExpiry ?? new Date().toISOString();
+  }
+
+  return new Date(earliest).toISOString();
 }
 
 function computeEarliestExpiry(roots: readonly TrustBundleRoot[]): string | null {

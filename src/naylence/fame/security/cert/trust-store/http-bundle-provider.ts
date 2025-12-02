@@ -262,21 +262,51 @@ export class HttpBundleProvider implements TrustStoreProvider {
       throw new Error("Trust bundle hash mismatch");
     }
 
+    const bundle = parseBundlePayload(payload, this.url.href);
+
+    // Version-based updates: if bundle has version field and it increased, allow hash change
+    const isVersionUpgrade = bundle.version !== null && this.version !== null && bundle.version > this.version;
+    
     let expectedHash = pins ? hash : null;
     if (!pins) {
-      if (this.lastKnownHash) {
-        if (this.lastKnownHash !== hash) {
-          throw new Error("Trust bundle hash changed without pin");
+      if (this.allowTofu) {
+        // TOFU mode: trust on first use, or if version increased
+        if (!this.lastKnownHash || isVersionUpgrade) {
+          expectedHash = hash;
+          if (this.lastKnownHash && this.lastKnownHash !== hash && isVersionUpgrade) {
+            logger.info("trust_bundle_updated_via_version", {
+              url: this.url.href,
+              previousVersion: this.version,
+              newVersion: bundle.version,
+              previousHash: this.lastKnownHash,
+              newHash: hash,
+            });
+          }
+        } else if (this.lastKnownHash !== hash) {
+          throw new Error("Trust bundle hash changed without version upgrade");
+        } else {
+          expectedHash = hash;
         }
-        expectedHash = hash;
-      } else if (this.allowTofu) {
-        expectedHash = hash;
+      } else if (this.lastKnownHash) {
+        // No TOFU, no pins: hash must not change once established, unless version increased
+        if (this.lastKnownHash !== hash) {
+          if (isVersionUpgrade) {
+            logger.info("trust_bundle_updated_via_version", {
+              url: this.url.href,
+              previousVersion: this.version,
+              newVersion: bundle.version,
+            });
+            expectedHash = hash;
+          } else {
+            throw new Error("Trust bundle hash changed without pin or version upgrade");
+          }
+        } else {
+          expectedHash = hash;
+        }
       } else if (isBrowserEnvironment() && this.enforceBrowserPins) {
         throw new Error("Browser download without pins or TOFU is blocked");
       }
     }
-
-    const bundle = parseBundlePayload(payload, this.url.href);
 
     if (bundle.version !== null && this.version !== null) {
       if (bundle.version < this.version) {

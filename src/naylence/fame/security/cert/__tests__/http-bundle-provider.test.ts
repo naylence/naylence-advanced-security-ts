@@ -269,4 +269,54 @@ describe("HttpBundleProvider", () => {
       "Browser environments require hash pin, SPKI allowlist, or TOFU",
     );
   });
+
+  it("allows hash updates in TOFU mode after cache is established", async () => {
+    const originalProcess = globalThis.process;
+    delete (globalThis as { process?: NodeJS.Process }).process;
+
+    try {
+      const bundle1 = createJsonBundle(1);
+      const bundle2 = createJsonBundle(2);
+
+      let callCount = 0;
+      const fetchMock = jest.fn(async () => {
+        callCount += 1;
+        const bundle = callCount === 1 ? bundle1 : bundle2;
+        return new Response(bundle.bytes, {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+
+      const { HttpBundleProvider, fsMock } = await setupModule(
+        fetchMock as unknown as typeof fetch,
+      );
+
+      // Simulate cache with old hash
+      const cachedHash = "OLD_HASH_VALUE";
+      fsMock.readFile.mockResolvedValueOnce(
+        JSON.stringify({
+          anchors: [{ pem: SAMPLE_PEM, kid: "root" }],
+          etag: null,
+          fetchedAt: Date.now() - 86_400_000 - 1000, // 24+ hours ago
+          hash: cachedHash,
+          version: 1,
+        }),
+      );
+
+      const provider = new HttpBundleProvider({
+        url: "https://example.com/bundle.json",
+        allowTofu: true,
+        cacheKey: "test-tofu-hash-update",
+      });
+
+      // This should succeed even though hash changed, because TOFU allows updates
+      const roots = await provider.getRoots();
+
+      expect(roots).toHaveLength(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      (globalThis as { process?: NodeJS.Process }).process = originalProcess;
+    }
+  });
 });
