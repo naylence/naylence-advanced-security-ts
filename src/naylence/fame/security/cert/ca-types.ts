@@ -45,6 +45,40 @@ export interface CertificateIssuanceResponse {
 }
 
 /**
+ * Trust bundle certificate entry.
+ */
+export interface TrustBundleRoot {
+  /** Certificate in PEM format */
+  pem: string;
+
+  /** Optional key identifier */
+  kid?: string;
+
+  /** Optional notBefore timestamp */
+  notBefore?: string;
+
+  /** Optional notAfter timestamp */
+  notAfter?: string;
+}
+
+/**
+ * Trust bundle document served by the CA.
+ */
+export interface TrustBundleDocument {
+  /** Monotonic version number that changes when bundle contents rotate */
+  version: number;
+
+  /** Time the bundle was generated */
+  issuedAt: string;
+
+  /** Earliest expiration among the bundled roots */
+  validUntil: string | null;
+
+  /** Trust anchors */
+  roots: TrustBundleRoot[];
+}
+
+/**
  * Abstract CA signing service interface.
  *
  * Defines the contract for certificate authority services that can issue
@@ -67,6 +101,15 @@ export abstract class CAService {
   abstract issueCertificate(
     csr: CertificateSigningRequest,
   ): Promise<CertificateIssuanceResponse>;
+
+  /**
+   * Retrieve the current trust bundle served by this CA service.
+   *
+   * Default implementation returns null if the service does not expose a bundle.
+   */
+  async getTrustBundle(): Promise<TrustBundleDocument | null> {
+    return null;
+  }
 }
 
 /**

@@ -5,6 +5,7 @@ import type { FamePlugin } from "@naylence/factory";
 import { Registry } from "@naylence/factory";
 
 import { registerAdvancedSecurityFactories } from "./naylence/fame/security/register-advanced-security-factories.js";
+import { VERSION } from './version.js';
 
 type FactoryRegistrar = Pick<typeof Registry, "registerFactory">;
 
@@ -19,6 +20,7 @@ let initializing: Promise<void> | null = null;
 
 const advancedSecurityPlugin: FamePlugin = {
   name: "naylence:advanced-security",
+  version: VERSION,
   async register(): Promise<void> {
     // console.log('[naylence:advanced-security] register() called, initialized=', initialized);
     if (initialized) {

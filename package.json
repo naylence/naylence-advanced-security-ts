@@ -22,27 +22,97 @@
     "url": "https://github.com/naylence/naylence-advanced-security-ts/issues"
   },
   "homepage": "https://github.com/naylence/naylence-advanced-security-ts#readme",
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
+  "main": "dist/node/node.cjs",
+  "module": "dist/node/node.mjs",
   "types": "dist/types/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js",
-      "types": "./dist/types/index.d.ts"
+      "types": "./dist/types/index.d.ts",
+      "import": {
+        "browser": "./dist/browser/index.mjs",
+        "default": "./dist/node/node.mjs"
+      },
+      "require": {
+        "browser": "./dist/browser/index.cjs",
+        "default": "./dist/node/node.cjs"
+      }
+    },
+    "./node": {
+      "types": "./dist/types/node.d.ts",
+      "import": "./dist/node/node.mjs",
+      "require": "./dist/node/node.cjs"
     },
     "./browser": {
-      "import": "./dist/browser/index.js",
-      "types": "./dist/types/index.d.ts"
+      "types": "./dist/types/browser.d.ts",
+      "import": "./dist/browser/index.mjs",
+      "require": "./dist/browser/index.cjs"
+    },
+    "./install-env": {
+      "types": "./dist/types/install-env.d.ts",
+      "import": "./dist/esm/install-env.js",
+      "require": "./dist/cjs/install-env.js",
+      "default": "./dist/esm/install-env.js"
+    },
+    "./factory-manifest": {
+      "types": "./dist/types/naylence/fame/factory-manifest.d.ts",
+      "import": "./dist/esm/naylence/fame/factory-manifest.js",
+      "require": "./dist/cjs/naylence/fame/factory-manifest.js",
+      "default": "./dist/esm/naylence/fame/factory-manifest.js"
+    },
+    "./register-advanced-security-factories": {
+      "types": "./dist/types/naylence/fame/security/register-advanced-security-factories.d.ts",
+      "import": "./dist/esm/naylence/fame/security/register-advanced-security-factories.js",
+      "require": "./dist/cjs/naylence/fame/security/register-advanced-security-factories.js",
+      "default": "./dist/esm/naylence/fame/security/register-advanced-security-factories.js"
     },
     "./plugin": {
+      "types": "./dist/types/plugin.d.ts",
       "import": "./dist/esm/plugin.js",
-      "default": "./dist/esm/plugin.js",
-      "types": "./dist/types/plugin.d.ts"
+      "require": "./dist/cjs/plugin.js",
+      "default": "./dist/esm/plugin.js"
+    },
+    "./*": {
+      "types": "./dist/types/*",
+      "import": "./dist/esm/*",
+      "require": "./dist/cjs/*",
+      "default": "./dist/esm/*"
     }
   },
+  "browser": {
+    "./dist/node/index.mjs": "./dist/browser/index.mjs",
+    "./dist/node/index.cjs": "./dist/browser/index.cjs",
+    "fastify": false,
+    "@fastify/websocket": false,
+    "@fastify/formbody": false,
+    "better-sqlite3": false,
+    "express": false,
+    "pino": false,
+    "pino-pretty": false,
+    "fs": false,
+    "readline": false,
+    "crypto": false,
+    "ws": false,
+    "node:net": false,
+    "node:module": false,
+    "node:fs": false,
+    "node:fs/promises": false,
+    "node:path": false,
+    "node:crypto": false,
+    "node:url": false,
+    "node:http": false,
+    "node:https": false,
+    "node:os": false
+  },
+  "sideEffects": [
+    "**/*-factory.ts",
+    "**/*-factory.js",
+    "**/storage/index.ts",
+    "**/storage/index.js",
+    "dist/browser/index.mjs",
+    "dist/browser/index.cjs"
+  ],
   "bin": {
-    "naylence-ca-server": "./dist/esm/naylence/fame/security/cert/ca-server.js"
+    "naylence-ca-server": "./dist/esm/naylence/fame/security/cert/ca-server-cli.js"
   },
   "files": [
     "dist",
@@ -58,23 +128,26 @@
     "build:browser": "rollup -c rollup.config.js",
     "clean": "rimraf dist",
     "generate:factory-manifest": "node ./scripts/generate-factory-manifest.mjs",
+    "inject-version": "node ./scripts/inject-version.js",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --passWithNoTests",
+    "test:vitest": "vitest run",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "dev": "tsc --watch --outDir dist/esm",
-    "prebuild": "npm run generate:factory-manifest",
-    "predev": "npm run generate:factory-manifest",
+    "prebuild": "npm run inject-version && npm run generate:factory-manifest",
+    "predev": "npm run inject-version && npm run generate:factory-manifest",
     "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
-    "@naylence/runtime": "^0.3.3",
+    "@naylence/runtime": "^0.3.5-test.918",
     "@noble/ciphers": "^2.0.1",
     "@noble/curves": "^1.4.0",
     "@noble/ed25519": "^2.1.0",
     "@noble/hashes": "^1.4.0",
+    "@peculiar/asn1-csr": "^2.5.0",
     "@peculiar/asn1-schema": "^2.5.0",
     "@peculiar/asn1-x509": "^2.5.0",
     "@peculiar/x509": "^1.14.0",
@@ -122,6 +195,7 @@
     "ts-jest": "^29.4.4",
     "tslib": "^2.6.2",
     "typescript": "^5.3.2",
+    "vitest": "^2.1.4",
     "ws": "^8.18.0"
   },
   "engines": {

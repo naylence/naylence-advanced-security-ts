@@ -2,6 +2,8 @@ import { jest } from "@jest/globals";
 
 import { FACTORY_META as DEFAULT_CA_SERVICE_FACTORY_META } from "../naylence/fame/security/cert/default-ca-service-factory.js";
 import { FACTORY_META as DEFAULT_CERTIFICATE_MANAGER_FACTORY_META } from "../naylence/fame/security/cert/default-certificate-manager-factory.js";
+import { FACTORY_META as BROWSER_TRUST_STORE_FACTORY_META } from "../naylence/fame/security/cert/trust-store/browser-trust-store-provider-factory.js";
+import { FACTORY_META as NODE_TRUST_STORE_FACTORY_META } from "../naylence/fame/security/cert/trust-store/node-trust-store-provider-factory.js";
 import { FACTORY_META as CHANNEL_ENCRYPTION_FACTORY_META } from "../naylence/fame/security/encryption/channel/channel-encryption-manager-factory.js";
 import { FACTORY_META as COMPOSITE_ENCRYPTION_FACTORY_META } from "../naylence/fame/security/encryption/composite-encryption-manager-factory.js";
 import { FACTORY_META as DEFAULT_SECURE_CHANNEL_FACTORY_META } from "../naylence/fame/security/encryption/default-secure-channel-manager-factory.js";
@@ -21,6 +23,14 @@ const expectedFactories = [
   {
     base: DEFAULT_CERTIFICATE_MANAGER_FACTORY_META.base,
     key: DEFAULT_CERTIFICATE_MANAGER_FACTORY_META.key,
+  },
+  {
+    base: BROWSER_TRUST_STORE_FACTORY_META.base,
+    key: BROWSER_TRUST_STORE_FACTORY_META.key,
+  },
+  {
+    base: NODE_TRUST_STORE_FACTORY_META.base,
+    key: NODE_TRUST_STORE_FACTORY_META.key,
   },
   {
     base: CHANNEL_ENCRYPTION_FACTORY_META.base,

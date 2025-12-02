@@ -16,6 +16,7 @@ import {
 import { encodeUtf8 } from "@naylence/runtime/naylence/fame/security/signing/eddsa-utils.js";
 import { JWKValidationError, validateSigningKey } from "@naylence/runtime";
 import { publicKeyFromX5c } from "../cert/util.js";
+import type { TrustStoreProvider } from "../cert/trust-store/trust-store-provider.js";
 
 type SigningConfig = InstanceType<typeof SigningConfigClass>;
 
@@ -100,7 +101,7 @@ function normalizeCertificateKey(
 
   if (!trustStorePem) {
     throw new Error(
-      "FAME_CA_CERTS environment variable must be set to a PEM file containing trusted CA certs when using certificate-based verification",
+      "Certificate-based verification requires a configured trust store provider (for example, configure FAME_CA_CERTS).",
     );
   }
 
@@ -116,83 +117,16 @@ function normalizeCertificateKey(
   return encodeBase64Url(publicKey);
 }
 
-async function loadPublicKey(
-  jwk: VerifierJwk,
-  signingConfig: SigningConfig,
-): Promise<Uint8Array> {
-  const trustStorePem = await resolveTrustStorePem();
-  const certificateKey = normalizeCertificateKey(
-    jwk,
-    signingConfig,
-    trustStorePem,
-  );
-
-  const candidate =
-    certificateKey ??
-    (typeof jwk.x === "string"
-      ? jwk.x
-      : typeof jwk.crv_x === "string"
-        ? jwk.crv_x
-        : jwk.pub);
-
-  if (typeof candidate !== "string") {
-    throw new Error("JWK missing public key material");
-  }
-
-  return decodeBase64Url(candidate);
-}
-
-function hasProcessEnv(): boolean {
-  return typeof process !== "undefined" && typeof process.env !== "undefined";
-}
-
-function isNodeProcess(): boolean {
-  return (
-    typeof process !== "undefined" &&
-    typeof process.release !== "undefined" &&
-    process.release?.name === "node"
-  );
-}
-
-async function resolveTrustStorePem(): Promise<string | null> {
-  if (!hasProcessEnv()) {
-    return null;
-  }
-
-  const rawValue = process.env?.FAME_CA_CERTS ?? null;
-  if (!rawValue || rawValue.trim().length === 0) {
-    return null;
-  }
-
-  const trimmed = rawValue.replace(/\r/gu, "").trim();
-  if (trimmed.startsWith("-----BEGIN")) {
-    return trimmed;
-  }
-
-  if (!isNodeProcess()) {
-    throw new Error(
-      "FAME_CA_CERTS must contain PEM-encoded certificates when running outside of Node.js",
-    );
-  }
-
-  try {
-    const fs = await import("node:fs/promises");
-    const content = await fs.readFile(trimmed, "utf8");
-    return content.replace(/\r/gu, "").trim();
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to read trust store from ${trimmed}: ${reason}`);
-  }
-}
-
 export interface EdDSAEnvelopeVerifierOptions {
   readonly signingConfig?: SigningConfig | null;
+  readonly trustStoreProvider?: TrustStoreProvider | null;
 }
 
 export class EdDSAEnvelopeVerifier {
   private readonly keyProvider: KeyProvider;
 
   private readonly signingConfig: SigningConfig;
+  private readonly trustStoreProvider: TrustStoreProvider | null;
 
   public constructor(
     keyProvider: KeyProvider,
@@ -200,7 +134,65 @@ export class EdDSAEnvelopeVerifier {
   ) {
     this.keyProvider = keyProvider;
     this.signingConfig = options.signingConfig ?? new SigningConfigClass();
+    this.trustStoreProvider = options.trustStoreProvider ?? null;
     ensureNobleSha512Fallback();
+  }
+
+  private async loadTrustStorePem(): Promise<string | null> {
+    if (!this.trustStoreProvider) {
+      return null;
+    }
+
+    if (typeof this.trustStoreProvider.initialize === "function") {
+      await this.trustStoreProvider.initialize();
+    }
+
+    const pem = await this.trustStoreProvider.getTrustStorePem();
+    const normalized = pem.replace(/\r/gu, "").trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  private async resolveVerificationKey(
+    kid: string,
+    jwk: VerifierJwk,
+  ): Promise<{ normalizedJwk: VerifierJwk; publicKey: Uint8Array }> {
+    const trustStorePem = await this.loadTrustStorePem();
+    const certificateKey = normalizeCertificateKey(
+      jwk,
+      this.signingConfig,
+      trustStorePem,
+    );
+
+    const candidate =
+      certificateKey ??
+      (typeof jwk.x === "string"
+        ? jwk.x
+        : typeof jwk.crv_x === "string"
+          ? jwk.crv_x
+          : jwk.pub);
+
+    if (typeof candidate !== "string") {
+      throw new Error("JWK missing public key material");
+    }
+
+    const normalizedJwk: VerifierJwk = { ...jwk };
+    if (certificateKey || typeof normalizedJwk.x !== "string") {
+      normalizedJwk.x = certificateKey ?? candidate;
+    }
+
+    try {
+      validateSigningKey(normalizedJwk);
+    } catch (error) {
+      if (error instanceof JWKValidationError) {
+        throw new Error(
+          `Key ${kid} is not valid for signing: ${error.message}`,
+        );
+      }
+      throw error;
+    }
+
+    const publicKey = decodeBase64Url(candidate);
+    return { normalizedJwk, publicKey };
   }
 
   public async verifyEnvelope(
@@ -226,16 +218,10 @@ export class EdDSAEnvelopeVerifier {
       throw new Error(`Unknown key id: ${kid}`);
     }
 
-    try {
-      validateSigningKey(jwk);
-    } catch (error) {
-      if (error instanceof JWKValidationError) {
-        throw new Error(
-          `Key ${kid} is not valid for signing: ${error.message}`,
-        );
-      }
-      throw error;
-    }
+    const { normalizedJwk, publicKey } = await this.resolveVerificationKey(
+      kid,
+      jwk,
+    );
 
     const checkPayload = options.checkPayload ?? true;
 
@@ -264,7 +250,7 @@ export class EdDSAEnvelopeVerifier {
       trustedDigest = frameDigest(envelope.frame);
     }
 
-    const sid = assertString(jwk.sid, "Signing key missing sid");
+  const sid = assertString(normalizedJwk.sid, "Signing key missing sid");
     const immutable = canonicalJson(immutableHeaders(envelope));
     const tbs = new Uint8Array(
       encodeUtf8(sid).length +
@@ -296,7 +282,6 @@ export class EdDSAEnvelopeVerifier {
       throw new Error("Signature must be 64 bytes for Ed25519");
     }
 
-    const publicKey = await loadPublicKey(jwk, this.signingConfig);
     if (publicKey.length !== 32) {
       throw new Error("Ed25519 public key must be 32 bytes");
     }

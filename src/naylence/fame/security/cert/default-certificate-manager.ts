@@ -18,6 +18,8 @@ import {
 import { CertificateRequestError } from "./ca-types.js";
 import { GRANT_PURPOSE_CA_SIGN } from "./grants.js";
 import { validateJwkX5cCertificate } from "./util.js";
+import { createEd25519CsrFromPem } from "./node-ed25519-csr.js";
+import { TrustStoreProviderFactory } from "./trust-store/trust-store-provider-factory.js";
 
 const logger = getLogger(
   "naylence.fame.security.cert.default_certificate_manager",
@@ -35,6 +37,19 @@ export interface DefaultCertificateManagerOptions {
   readonly caServiceUrl?: string | null;
   readonly cryptoProvider?: unknown | null;
   readonly crypto_provider?: unknown | null;
+  /**
+   * Optional certificate material source that is preferred before falling back to environment variables.
+   * Accepts either a static material object or a function that resolves it lazily for browser runtimes.
+   */
+  readonly certificateMaterial?: CertificateMaterialSource | null;
+  /**
+   * Optional trust-store PEM source used when validating x509 chains outside of Node environments.
+   */
+  readonly trustStorePem?: TrustStorePemSource | null;
+  /**
+   * Optional hook invoked after certificate material is stored, enabling custom persistence (e.g., IndexedDB).
+   */
+  readonly persistCertificateMaterial?: CertificatePersistenceHook | null;
 }
 
 type CertificateMaterial = {
@@ -42,7 +57,23 @@ type CertificateMaterial = {
   readonly certificateChainPem: string | null;
 };
 
-const ENV_VAR_FAME_CA_CERTS = "FAME_CA_CERTS";
+type MaybePromise<T> = T | Promise<T>;
+
+type CertificateMaterialSource =
+  | CertificateMaterial
+  | (() => MaybePromise<CertificateMaterial | null>);
+
+type TrustStorePemSource = string | (() => MaybePromise<string | null>);
+
+type CertificatePersistenceHook = (
+  material: CertificateMaterial,
+  context: { nodeId: string | null },
+) => MaybePromise<void>;
+
+type CertificateMaterialResolver = () => Promise<CertificateMaterial | null>;
+
+type TrustStorePemResolver = () => Promise<string | null>;
+
 
 const CONNECTION_GRANTS_CAMEL = "connectionGrants" as const;
 const CONNECTION_GRANTS_SNAKE = "connection_grants" as const;
@@ -67,14 +98,16 @@ type CertificateAwareProvider = {
     physicalPath: string | undefined,
     logicals: string[],
   ) => void;
-  createCsr?: (
-    nodeId: string,
-    physicalPath: string,
-    logicals: string[],
-    subjectName?: string,
-  ) => Promise<string> | string;
   nodeJwk?: () => Record<string, unknown> | null | undefined;
   signatureKeyId?: string | null | undefined;
+  signingPrivatePem?: string | null | undefined;
+  signingPublicPem?: string | null | undefined;
+  resolveCertificateMaterial?: () => MaybePromise<CertificateMaterial | null>;
+  resolveTrustStorePem?: () => MaybePromise<string | null>;
+  persistSignedCertificate?: (
+    material: CertificateMaterial,
+    context: { nodeId: string | null },
+  ) => MaybePromise<void>;
 };
 
 type CaSignGrant = HttpConnectionGrant & {
@@ -88,6 +121,9 @@ export class DefaultCertificateManager implements CertificateManager {
   private securitySettings: SecuritySettings | null;
   private readonly caServiceUrl: string | null;
   private readonly cryptoProviderOverride: unknown | null;
+  private readonly certificateMaterialResolver: CertificateMaterialResolver | null;
+  private readonly trustStorePemResolver: TrustStorePemResolver | null;
+  private readonly certificatePersistenceHook: CertificatePersistenceHook | null;
   private node: NodeLike | null = null;
   private pendingWelcomeFrame: NodeWelcomeFrame | null = null;
 
@@ -97,6 +133,16 @@ export class DefaultCertificateManager implements CertificateManager {
     this.caServiceUrl = options.caServiceUrl ?? null;
     this.cryptoProviderOverride =
       options.cryptoProvider ?? options.crypto_provider ?? null;
+    this.certificateMaterialResolver = normalizeCertificateMaterialResolver(
+      options.certificateMaterial ?? null,
+    );
+    this.trustStorePemResolver = normalizeTrustStorePemResolver(
+      options.trustStorePem ?? null,
+    );
+    this.certificatePersistenceHook =
+      normalizeCertificatePersistenceHook(
+        options.persistCertificateMaterial ?? null,
+      );
   }
 
   public setSigning(
@@ -260,10 +306,17 @@ export class DefaultCertificateManager implements CertificateManager {
     }
 
     if (!material) {
+      material = await this.resolveCertificateMaterialFromInjectedSources(
+        cryptoProvider,
+        nodeId,
+      );
+    }
+
+    if (!material) {
       logger.debug("attempting_certificate_resolution_from_environment", {
         system_id: nodeId,
       });
-      material = await resolveCertificateMaterial();
+      material = await resolveCertificateMaterialFromEnvironment();
     }
 
     if (!material) {
@@ -279,7 +332,11 @@ export class DefaultCertificateManager implements CertificateManager {
       return false;
     }
 
-    const stored = storeCertificateMaterial(cryptoProvider, material);
+    const stored = await this.storeCertificateMaterial(
+      cryptoProvider,
+      material,
+      nodeId,
+    );
     if (!stored) {
       logger.warning("certificate_storage_not_supported", {
         system_id: nodeId,
@@ -407,6 +464,61 @@ export class DefaultCertificateManager implements CertificateManager {
     return true;
   }
 
+  private async resolveCertificateMaterialFromInjectedSources(
+    provider: CertificateAwareProvider,
+    nodeId: string | null,
+  ): Promise<CertificateMaterial | null> {
+    const providerMaterial = await this.resolveCertificateMaterialFromProvider(
+      provider,
+      nodeId,
+    );
+    if (providerMaterial) {
+      logger.debug("certificate_material_resolved_from_provider", {
+        system_id: nodeId,
+      });
+      return providerMaterial;
+    }
+
+    if (this.certificateMaterialResolver) {
+      try {
+        const material = await this.certificateMaterialResolver();
+        if (material) {
+          logger.debug("certificate_material_resolved_from_options", {
+            system_id: nodeId,
+          });
+          return material;
+        }
+      } catch (error) {
+        logger.debug("certificate_material_option_resolution_failed", {
+          system_id: nodeId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return null;
+  }
+
+  private async resolveCertificateMaterialFromProvider(
+    provider: CertificateAwareProvider,
+    nodeId: string | null,
+  ): Promise<CertificateMaterial | null> {
+    if (typeof provider.resolveCertificateMaterial !== "function") {
+      return null;
+    }
+
+    try {
+      const material = await provider.resolveCertificateMaterial();
+      return normalizeCertificateMaterial(material ?? null);
+    } catch (error) {
+      logger.debug("provider_certificate_material_resolution_failed", {
+        system_id: nodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
   private getCaSignGrant(
     connectionGrants?: unknown[] | null,
   ): CaSignGrant | null {
@@ -478,22 +590,13 @@ export class DefaultCertificateManager implements CertificateManager {
         )
       : [];
 
-    if (typeof provider.createCsr !== "function") {
-      logger.warning("crypto_provider_missing_create_csr", {
-        node_id: nodeId,
-      });
-      return null;
-    }
-
-    let csrPem: string;
-    try {
-      const result = provider.createCsr(nodeId, physicalPath, logicals);
-      csrPem = typeof result === "string" ? result : await result;
-    } catch (error) {
-      logger.error("csr_generation_failed", {
-        node_id: nodeId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    const csrPem = await this.buildCertificateSigningRequest(
+      provider,
+      nodeId,
+      physicalPath,
+      logicals,
+    );
+    if (!csrPem) {
       return null;
     }
 
@@ -592,11 +695,12 @@ export class DefaultCertificateManager implements CertificateManager {
     provider: CertificateAwareProvider,
     nodeId: string | null,
   ): Promise<boolean> {
-    const trustStorePem = await resolveTrustStorePem();
+    const { pem: trustStorePem, reason } =
+      await this.resolveTrustStorePemValue(provider, nodeId);
     if (!trustStorePem) {
       logger.error("trust_anchor_validation_failed", {
         node_id: nodeId,
-        reason: `${ENV_VAR_FAME_CA_CERTS}_not_set`,
+        reason: reason ?? "trust_store_unavailable",
       });
       return false;
     }
@@ -671,6 +775,164 @@ export class DefaultCertificateManager implements CertificateManager {
       return false;
     }
   }
+
+  private async resolveTrustStorePemValue(
+    provider: CertificateAwareProvider,
+    nodeId: string | null,
+  ): Promise<{ pem: string | null; reason?: string }> {
+    const providerPem = await this.resolveTrustStorePemFromProvider(
+      provider,
+      nodeId,
+    );
+    if (providerPem) {
+      logger.debug("trust_store_resolved_from_provider", {
+        node_id: nodeId,
+      });
+      return { pem: providerPem };
+    }
+
+    if (this.trustStorePemResolver) {
+      try {
+        const pem = await this.trustStorePemResolver();
+        const normalized = normalizePemOrNull(pem);
+        if (normalized) {
+          logger.debug("trust_store_resolved_from_options", {
+            node_id: nodeId,
+          });
+          return { pem: normalized };
+        }
+      } catch (error) {
+        logger.debug("trust_store_option_resolution_failed", {
+          node_id: nodeId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const envPem = await resolveTrustStorePemFromEnvironment();
+    return {
+      pem: envPem,
+      reason: envPem ? undefined : "trust_store_provider_unconfigured",
+    };
+  }
+
+  private async resolveTrustStorePemFromProvider(
+    provider: CertificateAwareProvider,
+    nodeId: string | null,
+  ): Promise<string | null> {
+    if (typeof provider.resolveTrustStorePem !== "function") {
+      return null;
+    }
+
+    try {
+      const pem = await provider.resolveTrustStorePem();
+      return normalizePemOrNull(pem);
+    } catch (error) {
+      logger.debug("provider_trust_store_resolution_failed", {
+        node_id: nodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  private async storeCertificateMaterial(
+    provider: CertificateAwareProvider,
+    material: CertificateMaterial,
+    nodeId: string | null,
+  ): Promise<boolean> {
+    let stored = false;
+
+    if (typeof provider.storeSignedCertificate === "function") {
+      try {
+        await provider.storeSignedCertificate(
+          material.certificatePem,
+          material.certificateChainPem,
+        );
+        stored = true;
+      } catch (error) {
+        logger.warning("failed_to_store_certificate", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    const persistenceHooks: CertificatePersistenceHook[] = [];
+    if (typeof provider.persistSignedCertificate === "function") {
+      persistenceHooks.push((hookMaterial, context) =>
+        provider.persistSignedCertificate!(hookMaterial, context),
+      );
+    }
+    if (this.certificatePersistenceHook) {
+      persistenceHooks.push(this.certificatePersistenceHook);
+    }
+
+    for (const hook of persistenceHooks) {
+      try {
+        await hook(material, { nodeId });
+        stored = true;
+      } catch (error) {
+        logger.debug("certificate_persistence_hook_failed", {
+          node_id: nodeId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    return stored;
+  }
+
+  private async buildCertificateSigningRequest(
+    provider: CertificateAwareProvider,
+    nodeId: string,
+    physicalPath: string,
+    logicals: string[],
+  ): Promise<string | null> {
+    const trimmedPath = physicalPath.trim();
+    if (!trimmedPath) {
+      logger.warning("certificate_request_missing_physical_path", {
+        node_id: nodeId,
+      });
+      return null;
+    }
+
+    const pemSource = provider as {
+      signingPrivatePem?: string | null | undefined;
+      signingPublicPem?: string | null | undefined;
+    };
+
+    const privateKeyPem = pemSource.signingPrivatePem?.trim() ?? "";
+    const publicKeyPem = pemSource.signingPublicPem?.trim() ?? "";
+
+    if (!privateKeyPem || !publicKeyPem) {
+      logger.error("crypto_provider_missing_signing_material", {
+        node_id: nodeId,
+        has_private: Boolean(privateKeyPem),
+        has_public: Boolean(publicKeyPem),
+      });
+      return null;
+    }
+
+    const sanitizedLogicals = logicals.filter(
+      (value): value is string => typeof value === "string" && value.trim().length > 0,
+    );
+
+    try {
+      const { csrPem } = await createEd25519CsrFromPem({
+        privateKeyPem,
+        publicKeyPem,
+        commonName: nodeId,
+        logicals: sanitizedLogicals,
+      });
+      return csrPem;
+    } catch (error) {
+      logger.error("csr_generation_failed", {
+        node_id: nodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
 }
 
 function normalizeSigningConfig(
@@ -687,7 +949,70 @@ function normalizeSigningConfig(
   return new SigningConfigClass();
 }
 
-async function resolveCertificateMaterial(): Promise<CertificateMaterial | null> {
+function normalizeCertificateMaterial(
+  material: CertificateMaterial | null,
+): CertificateMaterial | null {
+  if (!material) {
+    return null;
+  }
+
+  const certificatePem = normalizePemOrNull(material.certificatePem);
+  if (!certificatePem) {
+    return null;
+  }
+
+  const certificateChainPem = normalizePemOrNull(
+    material.certificateChainPem ?? null,
+  );
+
+  return {
+    certificatePem,
+    certificateChainPem,
+  };
+}
+
+function normalizeCertificateMaterialResolver(
+  source: CertificateMaterialSource | null,
+): CertificateMaterialResolver | null {
+  if (!source) {
+    return null;
+  }
+
+  if (typeof source === "function") {
+    return async () => normalizeCertificateMaterial(await source());
+  }
+
+  const normalized = normalizeCertificateMaterial(source);
+  return normalized ? async () => normalized : null;
+}
+
+function normalizeTrustStorePemResolver(
+  source: TrustStorePemSource | null,
+): TrustStorePemResolver | null {
+  if (!source) {
+    return null;
+  }
+
+  if (typeof source === "function") {
+    return async () => normalizePemOrNull(await source());
+  }
+
+  const normalized = normalizePemOrNull(source);
+  return normalized ? async () => normalized : null;
+}
+
+function normalizeCertificatePersistenceHook(
+  hook: CertificatePersistenceHook | null,
+): CertificatePersistenceHook | null {
+  if (!hook) {
+    return null;
+  }
+  return async (material, context) => {
+    await hook(material, context);
+  };
+}
+
+async function resolveCertificateMaterialFromEnvironment(): Promise<CertificateMaterial | null> {
   const certificatePem = await resolvePemFromEnvironment(
     "FAME_NODE_CERT_PEM",
     "FAME_NODE_CERT_FILE",
@@ -716,8 +1041,9 @@ async function resolvePemFromEnvironment(
   }
 
   const inlineValue = process.env?.[envVar];
-  if (inlineValue && inlineValue.trim().length > 0) {
-    return normalizePem(inlineValue);
+  const inline = normalizePemOrNull(inlineValue ?? null);
+  if (inline) {
+    return inline;
   }
 
   const filePath = process.env?.[fileVar];
@@ -735,7 +1061,7 @@ async function resolvePemFromEnvironment(
   try {
     const fs = await import("node:fs/promises");
     const content = await fs.readFile(filePath, "utf8");
-    return normalizePem(content);
+    return normalizePemOrNull(content);
   } catch (error) {
     logger.warning("failed_to_read_certificate_file", {
       file: filePath,
@@ -747,6 +1073,14 @@ async function resolvePemFromEnvironment(
 
 function normalizePem(value: string): string {
   return value.replace(/\r/g, "").trim();
+}
+
+function normalizePemOrNull(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = normalizePem(value);
+  return normalized.length > 0 ? normalized : null;
 }
 
 function hasProcessEnv(): boolean {
@@ -783,28 +1117,6 @@ function providerHasCertificate(provider: CertificateAwareProvider): boolean {
   }
 
   return false;
-}
-
-function storeCertificateMaterial(
-  provider: CertificateAwareProvider,
-  material: CertificateMaterial,
-): boolean {
-  if (typeof provider.storeSignedCertificate !== "function") {
-    return false;
-  }
-
-  try {
-    provider.storeSignedCertificate(
-      material.certificatePem,
-      material.certificateChainPem,
-    );
-    return true;
-  } catch (error) {
-    logger.warning("failed_to_store_certificate", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
-  }
 }
 
 function readFrameValue<T = unknown>(
@@ -884,36 +1196,18 @@ function normalizeAuthConfig(
   return normalized;
 }
 
-async function resolveTrustStorePem(): Promise<string | null> {
-  if (!hasProcessEnv()) {
-    return null;
-  }
-
-  const rawValue = process.env?.[ENV_VAR_FAME_CA_CERTS];
-  if (!rawValue || rawValue.trim().length === 0) {
-    return null;
-  }
-
-  if (rawValue.trim().startsWith("-----BEGIN")) {
-    return rawValue.replace(/\r/g, "").trim();
-  }
-
-  if (!isNodeProcess()) {
-    logger.debug("trust_store_file_unavailable_in_browser", {
-      env_var: ENV_VAR_FAME_CA_CERTS,
-    });
-    return null;
-  }
-
-  const filePath = rawValue.trim();
+async function resolveTrustStorePemFromEnvironment(): Promise<string | null> {
   try {
-    const fs = await import("node:fs/promises");
-    const content = await fs.readFile(filePath, "utf8");
-    return content.replace(/\r/g, "").trim();
+    const provider = await TrustStoreProviderFactory.createTrustStoreProvider();
+    if (typeof provider.initialize === "function") {
+      await provider.initialize();
+    }
+    const pem = await provider.getTrustStorePem();
+    return normalizePemOrNull(pem);
   } catch (error) {
-    logger.error("failed_to_read_trust_store", {
-      file: filePath,
-      error: error instanceof Error ? error.message : String(error),
+    const message = error instanceof Error ? error.message : String(error);
+    logger.debug("trust_store_provider_resolution_failed", {
+      error: message,
     });
     return null;
   }

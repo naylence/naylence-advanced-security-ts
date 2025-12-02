@@ -1,10 +1,10 @@
 import type { SecuritySettings } from "@naylence/core";
-import { SigningConfigClass } from "@naylence/runtime";
+import { SigningConfigClass } from "@naylence/runtime/node";
 import {
   CertificateManagerFactory,
   CERTIFICATE_MANAGER_FACTORY_BASE_TYPE,
   type CertificateManagerConfig,
-} from "@naylence/runtime";
+} from "@naylence/runtime/node";
 
 import {
   DefaultCertificateManager,

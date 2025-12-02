@@ -9,10 +9,9 @@ import {
   id_ce_subjectAltName,
   Extension,
 } from "@peculiar/asn1-x509";
-import { sha256 } from "@noble/hashes/sha256";
-import { sha512 } from "@noble/hashes/sha2.js";
+import { sha256, sha512 } from "@noble/hashes/sha2.js";
 import { etc as edEtc, verify as ed25519Verify } from "@noble/ed25519";
-import { getLogger } from "@naylence/runtime";
+import { getLogger } from "@naylence/runtime/node";
 
 const logger = getLogger("naylence.fame.security.cert.util");
 

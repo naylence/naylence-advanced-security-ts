@@ -14,8 +14,6 @@ import {
 import { SignJWT } from "jose";
 
 import {
-  DefaultHttpServer,
-  getWebsocketListenerInstance,
   NodeFactory,
   type FameNode,
   SentinelFactory,
@@ -30,6 +28,14 @@ import {
   basicConfig,
   LogLevel,
 } from "@naylence/runtime";
+
+import {
+  DefaultHttpServer,
+  getWebsocketListenerInstance,
+} from "@naylence/runtime/node";
+
+import type { TestCACredentials } from "./test-ca-helpers.js";
+import { setupTestCACredentials } from "./test-ca-helpers.js";
 
 jest.setTimeout(20000);
 
@@ -326,12 +332,22 @@ async function waitForKeysForPath(
 }
 
 describe("Runtime Sentinel security integration (in advanced-security-ts)", () => {
-  beforeAll(() => {
+  let caCredentials: TestCACredentials | null = null;
+
+  beforeAll(async () => {
     basicConfig({ level: LogLevel.ERROR });
+    caCredentials = await setupTestCACredentials();
   });
 
   afterEach(async () => {
     await DefaultHttpServer.shutdownAll();
+  });
+
+  afterAll(async () => {
+    if (caCredentials) {
+      await caCredentials.cleanup();
+      caCredentials = null;
+    }
   });
 
   test("downstream node exchanges overlay security keys during attach", async () => {
