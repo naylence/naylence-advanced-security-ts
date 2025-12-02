@@ -157,8 +157,10 @@ export default {
   coverageReporters: ['text', 'lcov', 'html'],
   maxWorkers: 1, // Sequential execution to prevent race conditions
   testTimeout: 30000, // Increased for integration tests
+  setupFiles: [
+    '<rootDir>/test/setup-crypto.cjs',
+  ],
   setupFilesAfterEnv: [
-    '<rootDir>/test/setup-crypto.ts',
     '<rootDir>/test/setup-factories.ts',
   ],
 };
