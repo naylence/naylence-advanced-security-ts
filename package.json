@@ -1,10 +1,6 @@
 {
   "name": "@naylence/advanced-security",
-<<<<<<< HEAD
-  "version": "0.3.7",
-=======
   "version": "0.3.8",
->>>>>>> 696c656 (Updated dependencies)
   "type": "module",
   "description": "Advanced security utilities for the Naylence Fame runtime implemented in TypeScript.",
   "author": "Naylence Dev <naylencedev@gmail.com>",
