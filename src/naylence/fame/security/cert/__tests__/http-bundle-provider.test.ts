@@ -41,6 +41,12 @@ async function setupModule(fetchOverride?: typeof fetch) {
     homedir: () => "/tmp/naylence-http-trust-bundles",
   };
 
+  const loggerMock = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warning: jest.fn(),
+  };
+
   jest.resetModules();
   jest.clearAllMocks();
 
@@ -65,10 +71,15 @@ async function setupModule(fetchOverride?: typeof fetch) {
     homedir: osMock.homedir,
   }));
 
+  jest.doMock("@naylence/runtime", () => ({
+    getLogger: () => loggerMock,
+  }));
+
   const module = await import("../trust-store/http-bundle-provider.js");
   return {
     HttpBundleProvider: module.HttpBundleProvider,
     fsMock,
+    loggerMock,
   };
 }
 
