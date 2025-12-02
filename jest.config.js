@@ -67,7 +67,12 @@ const resolutionCache = new Map();
 for (const { alias, localDir, packageEntry, fallbackAlias } of packageMappings) {
   const aliasRegex = escapeRegex(alias);
   const distDir = resolve(__dirname, localDir);
-  const indexPath = resolve(distDir, 'index.js');
+  
+  let indexPath = resolve(distDir, 'index.js');
+  if (!existsSync(indexPath)) {
+    indexPath = resolve(distDir, 'index.ts');
+  }
+  
   const hasLocalBuild = existsSync(indexPath);
 
   let resolvedIndexPath = hasLocalBuild ? indexPath : null;
@@ -96,21 +101,20 @@ for (const { alias, localDir, packageEntry, fallbackAlias } of packageMappings) 
     }
   }
 
+  if (resolvedIndexPath && resolvedDir) {
+    resolutionCache.set(alias, { indexPath: resolvedIndexPath, dir: resolvedDir });
+  }
+
   moduleNameMapper[`^${aliasRegex}$`] = resolvedIndexPath ?? alias;
   moduleNameMapper[`^${aliasRegex}/(.*)$`] = resolvedDir
     ? `${resolvedDir}/$1`
     : `${alias}/$1`;
-
-  if (resolvedIndexPath && resolvedDir) {
-    resolutionCache.set(alias, { indexPath: resolvedIndexPath, dir: resolvedDir });
-  }
 }
 
 /** @type {import('ts-jest').JestConfigWithTsJest} */
 export default {
-  preset: 'ts-jest/presets/default-esm',
+  preset: 'ts-jest',
   testEnvironment: 'node',
-  extensionsToTreatAsEsm: ['.ts'],
   roots: [
     '<rootDir>/src',
   ],
@@ -119,12 +123,11 @@ export default {
     'node_modules/(?!(@naylence|@noble|yaml|jose)/)',
   ],
   transform: {
-    '^.+\\.(ts|js|mjs)$': [
+    '^.+\\.(ts|js|mjs|cjs)$': [
       'ts-jest',
       {
-        useESM: true,
         tsconfig: {
-          module: 'ESNext',
+          module: 'CommonJS',
           moduleResolution: 'node',
           esModuleInterop: true,
           allowSyntheticDefaultImports: true,
@@ -132,6 +135,7 @@ export default {
           sourceMap: true,
           inlineSources: true,
           inlineSourceMap: false, // Use separate source maps for better debugging
+          allowJs: true,
         },
         diagnostics: {
           ignoreCodes: [151001],
