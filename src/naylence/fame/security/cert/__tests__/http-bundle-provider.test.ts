@@ -331,6 +331,48 @@ describe("HttpBundleProvider", () => {
     }
   });
 
+  it("accepts hash rotation without version upgrade in relaxed dev mode", async () => {
+    const originalProcess = globalThis.process;
+    delete (globalThis as { process?: NodeJS.Process }).process;
+
+    try {
+      const bundle = createJsonBundle(1);
+      const fetchMock = jest.fn(async () =>
+        new Response(bundle.bytes, {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      const { HttpBundleProvider, fsMock } = await setupModule(
+        fetchMock as unknown as typeof fetch,
+      );
+
+      fsMock.readFile.mockResolvedValueOnce(
+        JSON.stringify({
+          anchors: [{ pem: SAMPLE_PEM, kid: "root" }],
+          etag: null,
+          fetchedAt: Date.now(),
+          hash: "OLD_HASH",
+          version: 1,
+        }),
+      );
+
+      const provider = new HttpBundleProvider({
+        url: "http://127.0.0.1:3000/.well-known/naylence/trust-bundle.json",
+        allowInsecureHttp: true,
+        cacheKey: "dev-hash-rotation",
+      });
+
+      const roots = await provider.getRoots();
+
+      expect(roots).toHaveLength(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      (globalThis as { process?: NodeJS.Process }).process = originalProcess;
+    }
+  });
+
   it("forces a refresh for loopback dev bundles even when cache looks fresh", async () => {
     const fetchResponse = new Response(createJsonBundle(5).bytes, {
       status: 200,

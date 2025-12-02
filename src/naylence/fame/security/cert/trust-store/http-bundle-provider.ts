@@ -129,13 +129,13 @@ export class HttpBundleProvider implements TrustStoreProvider {
     );
     this.hashPins = normalizeHashPins(options.hashPins);
     this.allowedSpkis = normalizeAllowedSpkis(options.allowedSpkis);
-    this.allowTofu = options.allowTofu === true;
-    this.enforceBrowserPins = options.enforcePinsInBrowser !== false;
     this.cacheKey =
       options.cacheKey ?? computeCacheKey(`${parsed.origin}${parsed.pathname}`);
 
     this.relaxedCacheRefresh =
-      !isProductionEnvironment() && (this.allowInsecureHttp || loopbackHost);
+      devMode && (this.allowInsecureHttp || loopbackHost);
+    this.allowTofu = options.allowTofu === true || this.relaxedCacheRefresh;
+    this.enforceBrowserPins = options.enforcePinsInBrowser !== false;
     this.forceRefreshNextFetch = this.relaxedCacheRefresh;
 
     if (this.relaxedCacheRefresh) {
@@ -290,14 +290,17 @@ export class HttpBundleProvider implements TrustStoreProvider {
 
     // Version-based updates: if bundle has version field and it increased, allow hash change
     const isVersionUpgrade = bundle.version !== null && this.version !== null && bundle.version > this.version;
+    const allowHashRotationWithoutVersion = this.relaxedCacheRefresh;
     
     let expectedHash = pins ? hash : null;
     if (!pins) {
       if (this.allowTofu) {
-        // TOFU mode: trust on first use, or if version increased
-        if (!this.lastKnownHash || isVersionUpgrade) {
+        const hasKnownHash = typeof this.lastKnownHash === "string" && this.lastKnownHash.length > 0;
+        const hashChanged = hasKnownHash && this.lastKnownHash !== hash;
+
+        if (!hasKnownHash || isVersionUpgrade || !hashChanged) {
           expectedHash = hash;
-          if (this.lastKnownHash && this.lastKnownHash !== hash && isVersionUpgrade) {
+          if (hashChanged && isVersionUpgrade) {
             logger.info("trust_bundle_updated_via_version", {
               url: this.url.href,
               previousVersion: this.version,
@@ -306,7 +309,14 @@ export class HttpBundleProvider implements TrustStoreProvider {
               newHash: hash,
             });
           }
-        } else if (this.lastKnownHash !== hash) {
+        } else if (hashChanged && allowHashRotationWithoutVersion) {
+          expectedHash = hash;
+          logger.info("trust_bundle_hash_rotated_without_version", {
+            url: this.url.href,
+            previousHash: this.lastKnownHash,
+            newHash: hash,
+          });
+        } else if (hashChanged) {
           throw new Error("Trust bundle hash changed without version upgrade");
         } else {
           expectedHash = hash;
