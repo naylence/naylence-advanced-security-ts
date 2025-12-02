@@ -451,6 +451,14 @@ export class DefaultCertificateManager implements CertificateManager {
 
     const validated = await this.validateProviderCertificate(provider, nodeId);
     if (!validated) {
+      const isDevMode = !isProductionEnvironment();
+      if (isDevMode) {
+        logger.warning("existing_certificate_validation_failed_discarding_in_dev", {
+          node_id: nodeId,
+        });
+        await this.clearProviderCertificate(provider, nodeId);
+        return false;
+      }
       logger.error("existing_certificate_validation_failed", {
         node_id: nodeId,
       });
@@ -880,6 +888,25 @@ export class DefaultCertificateManager implements CertificateManager {
     return stored;
   }
 
+  private async clearProviderCertificate(
+    provider: CertificateAwareProvider,
+    nodeId: string | null,
+  ): Promise<void> {
+    if (typeof provider.storeSignedCertificate === "function") {
+      try {
+        await provider.storeSignedCertificate("", null);
+        logger.debug("cleared_provider_certificate", {
+          node_id: nodeId,
+        });
+      } catch (error) {
+        logger.debug("failed_to_clear_provider_certificate", {
+          node_id: nodeId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
   private async buildCertificateSigningRequest(
     provider: CertificateAwareProvider,
     nodeId: string,
@@ -1192,6 +1219,14 @@ function normalizeAuthConfig(
   }
 
   return normalized;
+}
+
+function isProductionEnvironment(): boolean {
+  return (
+    typeof process !== "undefined" &&
+    typeof process.env !== "undefined" &&
+    process.env.NODE_ENV === "production"
+  );
 }
 
 export default DefaultCertificateManager;

@@ -343,7 +343,7 @@ export class HttpBundleProvider implements TrustStoreProvider {
     }
 
     if (bundle.version !== null && this.version !== null) {
-      if (bundle.version < this.version) {
+      if (bundle.version < this.version && !this.relaxedCacheRefresh) {
         throw new Error("Trust bundle downgrade detected");
       }
     }
