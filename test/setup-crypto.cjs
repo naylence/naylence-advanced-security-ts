@@ -2,7 +2,11 @@ const { webcrypto } = require('node:crypto');
 const { TextDecoder, TextEncoder } = require('util');
 
 if (typeof process === 'undefined') {
-  globalThis.process = require('process');
+  const processModule = require('process');
+  globalThis.process = processModule;
+  if (typeof global !== 'undefined') {
+    global.process = processModule;
+  }
 }
 
 if (typeof globalThis.crypto === 'undefined') {
