@@ -82,6 +82,8 @@ export class HttpBundleProvider implements TrustStoreProvider {
   private readonly enforceBrowserPins: boolean;
   private readonly cacheKey: string;
   private readonly allowInsecureHttp: boolean;
+  private readonly relaxedCacheRefresh: boolean;
+  private forceRefreshNextFetch: boolean;
 
   private lastFetched = 0;
   private etag: string | null = null;
@@ -99,6 +101,8 @@ export class HttpBundleProvider implements TrustStoreProvider {
     }
 
     const parsed = new URL(options.url);
+    const devMode = !isProductionEnvironment();
+    const loopbackHost = isLoopbackHostname(parsed.hostname);
     const allowInsecureEnv = isTruthyFlag(
       getGlobalFlag("FAME_TRUST_BUNDLE_ALLOW_HTTP"),
     );
@@ -106,10 +110,7 @@ export class HttpBundleProvider implements TrustStoreProvider {
     this.allowInsecureHttp = allowInsecureEnv || allowInsecureOption;
 
     if (parsed.protocol !== "https:") {
-      const isLoopbackHost = isLoopbackHostname(parsed.hostname);
-      const devMode = !isProductionEnvironment();
-
-      if (!(this.allowInsecureHttp && devMode && isLoopbackHost)) {
+      if (!(this.allowInsecureHttp && devMode && loopbackHost)) {
         throw new Error(
           "Trust bundle URL must use HTTPS (set allowInsecureHttp or FAME_TRUST_BUNDLE_ALLOW_HTTP for dev-only http)",
         );
@@ -118,7 +119,7 @@ export class HttpBundleProvider implements TrustStoreProvider {
       logger.warning("allowing_insecure_trust_bundle_url", {
         url: parsed.toString(),
         devMode,
-        isLoopbackHost,
+        isLoopbackHost: loopbackHost,
       });
     }
 
@@ -132,6 +133,18 @@ export class HttpBundleProvider implements TrustStoreProvider {
     this.enforceBrowserPins = options.enforcePinsInBrowser !== false;
     this.cacheKey =
       options.cacheKey ?? computeCacheKey(`${parsed.origin}${parsed.pathname}`);
+
+    this.relaxedCacheRefresh =
+      !isProductionEnvironment() && (this.allowInsecureHttp || loopbackHost);
+    this.forceRefreshNextFetch = this.relaxedCacheRefresh;
+
+    if (this.relaxedCacheRefresh) {
+      logger.debug("dev_mode_trust_bundle_refresh_enabled", {
+        url: parsed.toString(),
+        allowInsecureHttp: this.allowInsecureHttp,
+        loopback: loopbackHost,
+      });
+    }
 
     if (isBrowserEnvironment() && !this.allowTofu && this.enforceBrowserPins) {
       if (this.hashPins.length === 0 && this.allowedSpkis.length === 0) {
@@ -152,15 +165,22 @@ export class HttpBundleProvider implements TrustStoreProvider {
     }
 
     const now = Date.now();
-    const stale = now - this.lastFetched >= this.refreshIntervalMs;
-    if (stale || !this.anchors) {
+    const refreshDueToInterval = now - this.lastFetched >= this.refreshIntervalMs;
+    const shouldRefresh =
+      this.forceRefreshNextFetch || refreshDueToInterval || !this.anchors;
+    if (shouldRefresh) {
+      this.forceRefreshNextFetch = false;
       this.inflight = this.fetchLatest()
         .catch((error) => {
           logger.warning("trust_bundle_refresh_failed", {
             error: error instanceof Error ? error.message : String(error),
           });
-          if (this.anchors) {
-            return this.anchors;
+          if (this.relaxedCacheRefresh) {
+            this.forceRefreshNextFetch = true;
+          }
+          const cachedAnchors = this.anchors;
+          if (cachedAnchors) {
+            return cachedAnchors;
           }
           throw error;
         })
@@ -168,6 +188,10 @@ export class HttpBundleProvider implements TrustStoreProvider {
           this.inflight = null;
         });
       return this.inflight;
+    }
+
+    if (!this.anchors) {
+      throw new Error("Trust bundle cache is empty");
     }
 
     return this.anchors;

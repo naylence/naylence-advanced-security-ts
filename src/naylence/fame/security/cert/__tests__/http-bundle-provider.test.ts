@@ -330,4 +330,37 @@ describe("HttpBundleProvider", () => {
       (globalThis as { process?: NodeJS.Process }).process = originalProcess;
     }
   });
+
+  it("forces a refresh for loopback dev bundles even when cache looks fresh", async () => {
+    const fetchResponse = new Response(createJsonBundle(5).bytes, {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+    const fetchMock = jest.fn(async () => fetchResponse);
+    const { HttpBundleProvider, fsMock } = await setupModule(
+      fetchMock as unknown as typeof fetch,
+    );
+
+    fsMock.readFile.mockResolvedValueOnce(
+      JSON.stringify({
+        anchors: [{ pem: SAMPLE_PEM, kid: "root" }],
+        etag: "\"cached\"",
+        fetchedAt: Date.now() - 5_000,
+        hash: "dev_hash",
+        version: 1,
+      }),
+    );
+
+    const provider = new HttpBundleProvider({
+      url: "http://localhost:3000/.well-known/naylence/trust-bundle.json",
+      allowInsecureHttp: true,
+      allowTofu: true,
+      cacheKey: "dev-force-refresh",
+    });
+
+    const roots = await provider.getRoots();
+
+    expect(roots).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
