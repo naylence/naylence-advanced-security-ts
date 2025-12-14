@@ -4,6 +4,18 @@
  * helpers and Fastify bindings are intentionally excluded.
  */
 
+import plugin from './plugin.js';
+
+// Always register the plugin directly. This ensures it is initialized even if
+// the dynamic import mechanism fails.
+(async () => {
+  try {
+    await plugin.register();
+  } catch (err) {
+    console.error('[naylence:advanced-security] Failed to auto-register plugin:', err);
+  }
+})();
+
 // Import and use the loader to ensure bundlers don't tree-shake it away
 import { __advancedSecurityPluginLoader } from "./advanced-security-isomorphic.js";
 
