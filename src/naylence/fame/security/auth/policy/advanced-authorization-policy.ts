@@ -190,6 +190,22 @@ function createDeliveryBindings(
 }
 
 /**
+ * Creates node context bindings for expression evaluation.
+ */
+function createNodeBindings(
+  node: NodeLike
+): Record<string, ExprValue> {
+  return {
+    id: node.id,
+    sid: node.sid ?? null,
+    provisionalId: node.provisionalId,
+    physicalPath: node.physicalPath,
+    hasParent: node.hasParent,
+    publicUrl: node.publicUrl ?? null,
+  };
+}
+
+/**
  * Options for creating an AdvancedAuthorizationPolicy.
  */
 export interface AdvancedAuthorizationPolicyOptions {
@@ -270,7 +286,7 @@ export class AdvancedAuthorizationPolicy implements AuthorizationPolicy {
    * Evaluates the policy against a request.
    */
   async evaluateRequest(
-    _node: NodeLike,
+    node: NodeLike,
     envelope: FameEnvelope,
     context?: FameDeliveryContext,
     action?: RuleAction
@@ -393,6 +409,7 @@ export class AdvancedAuthorizationPolicy implements AuthorizationPolicy {
             claims: extractClaims(context),
             envelope: createEnvelopeBindings(envelope),
             delivery: createDeliveryBindings(context, resolvedAction),
+            node: createNodeBindings(node),
             time: {
               now_ms: Date.now(),
               now_iso: new Date().toISOString(),

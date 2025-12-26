@@ -881,4 +881,271 @@ describe("AdvancedAuthorizationPolicy", () => {
       }
     );
   });
+
+  describe("node context in expressions", () => {
+    it("provides access to node.id in when expressions", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "node-id-check",
+            effect: "allow",
+            action: "*",
+            when: 'node.id == "node-1"',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = { id: "node-1" };
+      const envelope = createMockEnvelope();
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        undefined,
+        "*"
+      );
+
+      expect(result.effect).toBe("allow");
+      expect(result.matchedRule).toBe("node-id-check");
+    });
+
+    it("provides access to node.sid in when expressions", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "node-sid-check",
+            effect: "allow",
+            action: "*",
+            when: 'node.sid == "production-cluster"',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = { id: "node-1", sid: "production-cluster", provisionalId: "prov-1", physicalPath: "/", hasParent: false, publicUrl: null };
+      const envelope = createMockEnvelope();
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        undefined,
+        "*"
+      );
+
+      expect(result.effect).toBe("allow");
+      expect(result.matchedRule).toBe("node-sid-check");
+    });
+
+    it("handles null node.sid correctly", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "null-sid-check",
+            effect: "allow",
+            action: "*",
+            when: "node.sid == null",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = { id: "node-1", sid: null, provisionalId: "prov-1", physicalPath: "/", hasParent: false, publicUrl: null };
+      const envelope = createMockEnvelope();
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        undefined,
+        "*"
+      );
+
+      expect(result.effect).toBe("allow");
+    });
+
+    it("provides access to node.physicalPath in when expressions", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "path-check",
+            effect: "allow",
+            action: "*",
+            when: 'starts_with(node.physicalPath, "/systems/prod/")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = { id: "node-1", sid: null, provisionalId: "prov-1", physicalPath: "/systems/prod/worker-01", hasParent: true, publicUrl: null };
+      const envelope = createMockEnvelope();
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        undefined,
+        "*"
+      );
+
+      expect(result.effect).toBe("allow");
+      expect(result.matchedRule).toBe("path-check");
+    });
+
+    it("provides access to node.hasParent in when expressions", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "parent-check",
+            effect: "allow",
+            action: "*",
+            when: "node.hasParent == true",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = { id: "node-1", sid: null, provisionalId: "prov-1", physicalPath: "/child", hasParent: true, publicUrl: null };
+      const envelope = createMockEnvelope();
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        undefined,
+        "*"
+      );
+
+      expect(result.effect).toBe("allow");
+    });
+
+    it("provides access to node.publicUrl in when expressions", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "url-check",
+            effect: "allow",
+            action: "*",
+            when: 'starts_with(node.publicUrl, "https://secure")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = { id: "node-1", sid: null, provisionalId: "prov-1", physicalPath: "/", hasParent: false, publicUrl: "https://secure.example.com" };
+      const envelope = createMockEnvelope();
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        undefined,
+        "*"
+      );
+
+      expect(result.effect).toBe("allow");
+    });
+
+    it("handles null node.publicUrl correctly", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "null-url-check",
+            effect: "deny",
+            action: "*",
+            when: "node.publicUrl == null",
+          },
+        ],
+        default_effect: "allow",
+      };
+
+      const policy = createPolicy(definition);
+      const node = { id: "node-1", sid: null, provisionalId: "prov-1", physicalPath: "/", hasParent: false, publicUrl: null };
+      const envelope = createMockEnvelope();
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        undefined,
+        "*"
+      );
+
+      expect(result.effect).toBe("deny");
+    });
+
+    it("combines node properties with other context in when expressions", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "combined-check",
+            effect: "allow",
+            action: "*",
+            when: 'node.sid == "prod" && has_scope("admin:write") && envelope.frame.type == "action"',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = { id: "node-1", sid: "prod", provisionalId: "prov-1", physicalPath: "/", hasParent: false, publicUrl: null };
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            grantedScopes: ["admin:write", "read"],
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      expect(result.effect).toBe("allow");
+      expect(result.matchedRule).toBe("combined-check");
+    });
+
+    it("denies when node condition does not match", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "mismatch-check",
+            effect: "allow",
+            action: "*",
+            when: 'node.id == "different-node"',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = { id: "node-1" };
+      const envelope = createMockEnvelope();
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        undefined,
+        "*"
+      );
+
+      expect(result.effect).toBe("deny");
+      const trace = result.evaluationTrace.find((t) => t.ruleId === "mismatch-check");
+      expect(trace?.expression).toContain("evaluated to false");
+    });
+  });
 });
