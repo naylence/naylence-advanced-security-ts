@@ -1,3 +1,4 @@
+export * from "./auth/index.js";
 export * from "./cert/index.js";
 export * from "./encryption/index.js";
 export * from "./keys/index.js";
