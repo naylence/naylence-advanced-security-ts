@@ -31,6 +31,32 @@ import {
   type CompiledPattern,
 } from "@naylence/runtime";
 
+/**
+ * Valid frame types that can be validated through authorization.
+ * 
+ * These frame types reach the dispatchRoutingActionSelected hook and can be
+ * subject to authorization checks. Frame types NOT in this list either:
+ * - Bypass authorization entirely (e.g., AddressBindAck)
+ * - Are not valid frame types in the protocol
+ */
+export const VALID_FRAME_TYPES = [
+  "Data",
+  "DeliveryAck",
+  "NodeAttach",
+  "NodeHello",
+  "NodeWelcome",
+  "NodeAttachAck",
+  "AddressBind",
+  "AddressUnbind",
+  "CapabilityAdvertise",
+  "CapabilityWithdraw",
+  "NodeHeartbeat",
+  "NodeHeartbeatAck",
+  "CreditUpdate",
+  "KeyAnnounce",
+  "KeyRequest",
+] as const;
+
 import type { NodeLike } from "@naylence/runtime";
 import type { AstNode } from "../../../expr/ast.js";
 import { parse } from "../../../expr/parser.js";
@@ -546,7 +572,7 @@ export class AdvancedAuthorizationPolicy implements AuthorizationPolicy {
     const addressPatterns = this.compileAddress(rule.address, id);
 
     // Compile frame type gating
-    const frameTypes = this.compileFrameTypes(rule.frame_type, id);
+    const frameTypes = this.compileFrameTypes(rule.frame_type as string | string[] | undefined, id);
 
     // Compile origin type gating
     const originTypes = this.compileOriginTypes(rule.origin_type, id);
@@ -733,13 +759,19 @@ export class AdvancedAuthorizationPolicy implements AuthorizationPolicy {
     }
 
     if (typeof frameType === "string") {
-      const normalized = frameType.trim().toLowerCase();
-      if (!normalized) {
+      const trimmed = frameType.trim();
+      if (!trimmed) {
         throw new Error(
           `Invalid frame_type in rule "${ruleId}": value must not be empty`
         );
       }
-      return new Set([normalized]);
+      if (!VALID_FRAME_TYPES.includes(trimmed as any)) {
+        throw new Error(
+          `Invalid frame_type in rule "${ruleId}": "${trimmed}". Must be one of: ${VALID_FRAME_TYPES.join(", ")}`
+        );
+      }
+      // Normalize to lowercase for matching
+      return new Set([trimmed.toLowerCase()]);
     }
 
     if (!Array.isArray(frameType)) {
@@ -754,23 +786,29 @@ export class AdvancedAuthorizationPolicy implements AuthorizationPolicy {
       );
     }
 
-    const frameTypes = new Set<string>();
-    for (const ft of frameType) {
-      if (typeof ft !== "string") {
+    const types = new Set<string>();
+    for (const type of frameType) {
+      if (typeof type !== "string") {
         throw new Error(
           `Invalid frame_type in rule "${ruleId}": all values must be strings`
         );
       }
-      const normalized = ft.trim().toLowerCase();
-      if (!normalized) {
+      const trimmed = type.trim();
+      if (!trimmed) {
         throw new Error(
           `Invalid frame_type in rule "${ruleId}": values must not be empty`
         );
       }
-      frameTypes.add(normalized);
+      if (!VALID_FRAME_TYPES.includes(trimmed as any)) {
+        throw new Error(
+          `Invalid frame_type in rule "${ruleId}": "${trimmed}". Must be one of: ${VALID_FRAME_TYPES.join(", ")}`
+        );
+      }
+      // Normalize to lowercase for matching
+      types.add(trimmed.toLowerCase());
     }
 
-    return frameTypes;
+    return types;
   }
 
   private compileOriginTypes(

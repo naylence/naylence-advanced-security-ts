@@ -48,6 +48,252 @@ function createPolicy(
 }
 
 describe("AdvancedAuthorizationPolicy", () => {
+  describe("frame_type validation", () => {
+    it("accepts valid frame type Data", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "Data",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).not.toThrow();
+    });
+
+    it("accepts valid frame type NodeHello", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "NodeHello",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).not.toThrow();
+    });
+
+    it("accepts array of valid frame types", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: ["Data", "NodeHello", "NodeWelcome"],
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).not.toThrow();
+    });
+
+    it("rejects invalid frame type", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "InvalidFrameType",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).toThrow(
+        /Invalid frame_type in rule.*InvalidFrameType.*Must be one of:/
+      );
+    });
+
+    it("rejects invalid frame type in array", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: ["Data", "BadType", "NodeHello"],
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).toThrow(
+        /Invalid frame_type in rule.*BadType.*Must be one of:/
+      );
+    });
+
+    it("rejects empty frame type string", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "  ",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).toThrow(
+        /Invalid frame_type in rule.*value must not be empty/
+      );
+    });
+
+    it("rejects empty frame type in array", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: ["Data", "  ", "NodeHello"],
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).toThrow(
+        /Invalid frame_type in rule.*values must not be empty/
+      );
+    });
+
+    it("lists all valid frame types in error message", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "WrongType",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      try {
+        createPolicy(definition);
+        throw new Error("Should have thrown");
+      } catch (error) {
+        const message = (error as Error).message;
+        // Verify error message includes common frame types
+        expect(message).toContain("Data");
+        expect(message).toContain("NodeHello");
+        expect(message).toContain("NodeWelcome");
+        expect(message).toContain("DeliveryAck");
+      }
+    });
+
+    it("normalizes frame type to lowercase for matching", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "Data", // Uppercase in policy
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = {
+        id: "env-1",
+        frame: { type: "data" }, // Lowercase in envelope
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        undefined,
+        "*"
+      );
+
+      expect(result.effect).toBe("allow");
+    });
+
+    it("rejects bypassed frame type AddressBindAck", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "AddressBindAck",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).toThrow(
+        /Invalid frame_type in rule.*AddressBindAck.*Must be one of:/
+      );
+    });
+
+    it("rejects bypassed frame type CapabilityAdvertiseAck", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "CapabilityAdvertiseAck",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).toThrow(
+        /Invalid frame_type in rule.*CapabilityAdvertiseAck.*Must be one of:/
+      );
+    });
+
+    it("accepts all enforceable frame types", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: [
+              "Data",
+              "DeliveryAck",
+              "NodeAttach",
+              "AddressBind",
+              "AddressUnbind",
+              "CapabilityAdvertise",
+              "CapabilityWithdraw",
+              "CreditUpdate",
+              "NodeHello",
+              "NodeWelcome",
+              "NodeAttachAck",
+              "NodeHeartbeat",
+              "NodeHeartbeatAck",
+              "KeyAnnounce",
+              "KeyRequest",
+            ],
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).not.toThrow();
+    });
+  });
+
   describe("basic rule matching without when", () => {
     it("matches allow rule without when expression", async () => {
       const definition: AuthorizationPolicyDefinition = {
