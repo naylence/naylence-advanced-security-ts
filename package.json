@@ -1,6 +1,6 @@
 {
   "name": "@naylence/advanced-security",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "description": "Advanced security utilities for the Naylence Fame runtime implemented in TypeScript.",
   "author": "Naylence Dev <naylencedev@gmail.com>",
@@ -121,11 +121,12 @@
     "NOTICE"
   ],
   "scripts": {
-    "build": "npm run clean && npm run build:types && npm run build:cjs && npm run build:esm && npm run build:browser",
+    "build": "npm run clean && npm run build:types && npm run build:cjs && npm run build:esm && npm run build:browser && npm run postbuild",
     "build:types": "tsc --emitDeclarationOnly --outDir dist/types",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build:browser": "rollup -c rollup.config.js",
+    "postbuild": "node ./scripts/create-dist-package-json.mjs",
     "clean": "rimraf dist",
     "generate:factory-manifest": "node ./scripts/generate-factory-manifest.mjs",
     "inject-version": "node ./scripts/inject-version.js",
