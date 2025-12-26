@@ -7,8 +7,8 @@
  * @packageDocumentation
  */
 
-// Expression engine
-export * from "./expr/index.js";
+// Auth expression helpers
+export { createAuthFunctionRegistry } from "./expr-builtins.js";
 
 // Expression authorization policy
 export {

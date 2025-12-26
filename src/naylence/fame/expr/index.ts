@@ -1,8 +1,8 @@
 /**
- * Expression engine for authorization policy `when` expressions.
+ * Generic expression engine.
  *
  * This module provides a deterministic, side-effect-free expression
- * evaluation engine for use in authorization policies.
+ * evaluation engine with injectable built-in functions.
  *
  * @packageDocumentation
  */
@@ -36,4 +36,5 @@ export {
   type ExprValue,
   type BuiltinFunction,
   type BuiltinContext,
+  type FunctionRegistry,
 } from "./builtins.js";

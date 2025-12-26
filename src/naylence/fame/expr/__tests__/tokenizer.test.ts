@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "@jest/globals";
-import { tokenize, TokenizerError } from "../expr/index.js";
+import { tokenize, TokenizerError } from "../index.js";
 
 describe("Tokenizer", () => {
   describe("literals", () => {

@@ -40,9 +40,12 @@ export interface BuiltinContext {
   readonly position: number;
   /** Source expression for error reporting */
   readonly source: string;
-  /** Granted scopes for scope helpers */
-  readonly grantedScopes?: readonly string[];
 }
+
+/**
+ * Function registry for built-in and injected functions.
+ */
+export type FunctionRegistry = ReadonlyMap<string, BuiltinFunction>;
 
 /**
  * Gets the type name of a value for error messages.
@@ -66,30 +69,6 @@ function assertString(
       functionName,
       `${argName} must be a string, got ${getTypeName(value)}`
     );
-  }
-}
-
-/**
- * Asserts that a value is an array of strings.
- */
-function assertStringArray(
-  value: ExprValue,
-  argName: string,
-  functionName: string
-): asserts value is readonly string[] {
-  if (!Array.isArray(value)) {
-    throw new BuiltinError(
-      functionName,
-      `${argName} must be an array of strings, got ${getTypeName(value)}`
-    );
-  }
-  for (let i = 0; i < value.length; i++) {
-    if (typeof value[i] !== "string") {
-      throw new BuiltinError(
-        functionName,
-        `${argName}[${i}] must be a string, got ${getTypeName(value[i] as ExprValue)}`
-      );
-    }
   }
 }
 
@@ -143,73 +122,6 @@ function assertArgCountRange(
     );
   }
 }
-
-// ============================================================
-// Scope Helpers
-// ============================================================
-
-/**
- * Checks if any granted scope matches a pattern (using glob syntax).
- */
-function matchesScope(
-  scope: string,
-  grantedScopes: readonly string[]
-): boolean {
-  // Simple exact match for now; advanced glob matching can be added
-  // For v1, we do exact match which is safe and deterministic
-  return grantedScopes.includes(scope);
-}
-
-/**
- * has_scope(scope: string) -> bool
- *
- * Returns true if the principal has the specified scope.
- */
-const has_scope: BuiltinFunction = (args, context) => {
-  assertArgCount(args, 1, "has_scope");
-  const scope = getArg(args, 0, "has_scope");
-  assertString(scope, "scope", "has_scope");
-
-  if (!context.grantedScopes) {
-    return false;
-  }
-
-  return matchesScope(scope, context.grantedScopes);
-};
-
-/**
- * has_any_scope(scopes: string[]) -> bool
- *
- * Returns true if the principal has any of the specified scopes.
- */
-const has_any_scope: BuiltinFunction = (args, context) => {
-  assertArgCount(args, 1, "has_any_scope");
-  const scopes = getArg(args, 0, "has_any_scope");
-  assertStringArray(scopes, "scopes", "has_any_scope");
-
-  if (!context.grantedScopes || scopes.length === 0) {
-    return false;
-  }
-
-  return scopes.some((scope) => matchesScope(scope, context.grantedScopes!));
-};
-
-/**
- * has_all_scopes(scopes: string[]) -> bool
- *
- * Returns true if the principal has all of the specified scopes.
- */
-const has_all_scopes: BuiltinFunction = (args, context) => {
-  assertArgCount(args, 1, "has_all_scopes");
-  const scopes = getArg(args, 0, "has_all_scopes");
-  assertStringArray(scopes, "scopes", "has_all_scopes");
-
-  if (!context.grantedScopes) {
-    return scopes.length === 0;
-  }
-
-  return scopes.every((scope) => matchesScope(scope, context.grantedScopes!));
-};
 
 // ============================================================
 // String Helpers
@@ -471,12 +383,7 @@ const regex_match: BuiltinFunction = (args, context) => {
 /**
  * Registry of all built-in functions.
  */
-export const BUILTIN_FUNCTIONS: ReadonlyMap<string, BuiltinFunction> = new Map([
-  // Scope helpers
-  ["has_scope", has_scope],
-  ["has_any_scope", has_any_scope],
-  ["has_all_scopes", has_all_scopes],
-
+export const BUILTIN_FUNCTIONS: FunctionRegistry = new Map([
   // String helpers
   ["lower", lower],
   ["upper", upper],
@@ -505,9 +412,10 @@ export const BUILTIN_FUNCTIONS: ReadonlyMap<string, BuiltinFunction> = new Map([
 export function callBuiltin(
   name: string,
   args: readonly ExprValue[],
-  context: BuiltinContext
+  context: BuiltinContext,
+  functions: FunctionRegistry = BUILTIN_FUNCTIONS
 ): ExprValue {
-  const fn = BUILTIN_FUNCTIONS.get(name);
+  const fn = functions.get(name);
   if (!fn) {
     throw new EvaluationError(
       `Unknown function: ${name}`,
@@ -521,6 +429,9 @@ export function callBuiltin(
 /**
  * Checks if a name is a built-in function.
  */
-export function isBuiltinFunction(name: string): boolean {
-  return BUILTIN_FUNCTIONS.has(name);
+export function isBuiltinFunction(
+  name: string,
+  functions: FunctionRegistry = BUILTIN_FUNCTIONS
+): boolean {
+  return functions.has(name);
 }

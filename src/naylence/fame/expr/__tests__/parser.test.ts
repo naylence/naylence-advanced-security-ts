@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "@jest/globals";
-import { parse, ParseError, type AstNode } from "../expr/index.js";
+import { parse, ParseError, type AstNode } from "../index.js";
 
 describe("Parser", () => {
   describe("literals", () => {

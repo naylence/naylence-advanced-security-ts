@@ -9,18 +9,19 @@ import {
   evaluateAsBoolean,
   type EvaluationContext,
   type ExprValue,
-} from "../expr/index.js";
+  type FunctionRegistry,
+} from "../index.js";
 
 function evalExpr(
   expression: string,
   bindings: Record<string, ExprValue> = {},
-  grantedScopes: string[] = []
+  functions?: FunctionRegistry
 ): ExprValue {
   const ast = parse(expression);
   const context: EvaluationContext = {
     bindings,
-    grantedScopes,
     source: expression,
+    functions,
   };
   const result = evaluate(ast, context);
   if (!result.success) {
@@ -32,13 +33,13 @@ function evalExpr(
 function evalBool(
   expression: string,
   bindings: Record<string, ExprValue> = {},
-  grantedScopes: string[] = []
+  functions?: FunctionRegistry
 ): boolean {
   const ast = parse(expression);
   const context: EvaluationContext = {
     bindings,
-    grantedScopes,
     source: expression,
+    functions,
   };
   const result = evaluateAsBoolean(ast, context);
   if (result.error) {
@@ -325,40 +326,6 @@ describe("Evaluator", () => {
   });
 
   describe("built-in functions", () => {
-    describe("scope helpers", () => {
-      it("has_scope returns true for granted scope", () => {
-        expect(evalBool('has_scope("admin")', {}, ["admin", "write"])).toBe(
-          true
-        );
-      });
-
-      it("has_scope returns false for missing scope", () => {
-        expect(evalBool('has_scope("admin")', {}, ["read"])).toBe(false);
-      });
-
-      it("has_any_scope checks any scope", () => {
-        expect(
-          evalBool('has_any_scope(["admin", "write"])', {}, ["write"])
-        ).toBe(true);
-        expect(
-          evalBool('has_any_scope(["admin", "write"])', {}, ["read"])
-        ).toBe(false);
-      });
-
-      it("has_all_scopes checks all scopes", () => {
-        expect(
-          evalBool('has_all_scopes(["read", "write"])', {}, [
-            "read",
-            "write",
-            "admin",
-          ])
-        ).toBe(true);
-        expect(
-          evalBool('has_all_scopes(["read", "write"])', {}, ["read"])
-        ).toBe(false);
-      });
-    });
-
     describe("string helpers", () => {
       it("lower converts to lowercase", () => {
         expect(evalExpr('lower("HELLO")')).toBe("hello");
@@ -446,12 +413,9 @@ describe("Evaluator", () => {
           email: "admin@example.com",
         },
       };
-      const scopes = ["read", "write"];
-
       const result = evalBool(
-        'claims.role == "admin" && has_scope("write")',
-        bindings,
-        scopes
+        'claims.role == "admin" && contains(claims.email, "@example.com")',
+        bindings
       );
       expect(result).toBe(true);
     });

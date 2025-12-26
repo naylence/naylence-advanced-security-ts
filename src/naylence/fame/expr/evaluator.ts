@@ -6,10 +6,12 @@
 
 import type { AstNode, BinaryOperator, UnaryOperator } from "./ast.js";
 import {
+  BUILTIN_FUNCTIONS,
   callBuiltin,
   getTypeName,
   type BuiltinContext,
   type ExprValue,
+  type FunctionRegistry,
 } from "./builtins.js";
 import { EvaluationError, TypeError } from "./errors.js";
 import {
@@ -21,14 +23,14 @@ import {
  * Evaluation context with variable bindings.
  */
 export interface EvaluationContext {
-  /** Variable bindings (claims, envelope, delivery, time) */
+  /** Variable bindings available to expressions */
   readonly bindings: Readonly<Record<string, ExprValue>>;
-  /** Granted scopes for scope helper functions */
-  readonly grantedScopes?: readonly string[];
   /** Expression limits */
   readonly limits?: ExpressionLimits;
   /** Source expression for error reporting */
   readonly source?: string;
+  /** Function registry for built-ins and injected helpers */
+  readonly functions?: FunctionRegistry;
 }
 
 /**
@@ -50,12 +52,14 @@ export class Evaluator {
   private readonly context: EvaluationContext;
   private readonly limits: ExpressionLimits;
   private readonly source: string;
+  private readonly functions: FunctionRegistry;
   private memberAccessDepth = 0;
 
   constructor(context: EvaluationContext) {
     this.context = context;
     this.limits = context.limits ?? DEFAULT_EXPRESSION_LIMITS;
     this.source = context.source ?? "";
+    this.functions = context.functions ?? BUILTIN_FUNCTIONS;
   }
 
   /**
@@ -232,10 +236,9 @@ export class Evaluator {
       limits: this.limits,
       position: node.position,
       source: this.source,
-      grantedScopes: this.context.grantedScopes,
     };
 
-    return callBuiltin(node.name, args, builtinContext);
+    return callBuiltin(node.name, args, builtinContext, this.functions);
   }
 
   private evaluateUnaryOp(

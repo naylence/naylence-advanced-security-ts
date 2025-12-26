@@ -32,12 +32,16 @@ import {
 } from "@naylence/runtime";
 
 import type { NodeLike } from "@naylence/runtime";
-import type { AstNode } from "./expr/ast.js";
-import { parse } from "./expr/parser.js";
-import { evaluateAsBoolean, type EvaluationContext } from "./expr/evaluator.js";
-import type { ExprValue } from "./expr/builtins.js";
-import type { ExpressionLimits } from "./expr/limits.js";
-import { DEFAULT_EXPRESSION_LIMITS } from "./expr/limits.js";
+import type { AstNode } from "../../../expr/ast.js";
+import { parse } from "../../../expr/parser.js";
+import {
+  evaluateAsBoolean,
+  type EvaluationContext,
+} from "../../../expr/evaluator.js";
+import type { ExprValue, FunctionRegistry } from "../../../expr/builtins.js";
+import type { ExpressionLimits } from "../../../expr/limits.js";
+import { DEFAULT_EXPRESSION_LIMITS } from "../../../expr/limits.js";
+import { createAuthFunctionRegistry } from "./expr-builtins.js";
 
 /**
  * Logger interface for minimal logging dependency.
@@ -290,6 +294,7 @@ export class AdvancedAuthorizationPolicy implements AuthorizationPolicy {
 
     // Prepare expression bindings (lazy)
     let expressionBindings: Record<string, ExprValue> | null = null;
+    let functionRegistry: FunctionRegistry | null = null;
 
     const evaluationTrace: AuthorizationEvaluationStep[] = [];
 
@@ -395,11 +400,15 @@ export class AdvancedAuthorizationPolicy implements AuthorizationPolicy {
           };
         }
 
+        const functions: FunctionRegistry =
+          functionRegistry ?? createAuthFunctionRegistry(grantedScopes);
+        functionRegistry = functions;
+
         const evalContext: EvaluationContext = {
           bindings: expressionBindings,
-          grantedScopes,
           limits: this.expressionLimits,
           source: rule.whenSource,
+          functions,
         };
 
         const whenResult = evaluateAsBoolean(rule.whenAst, evalContext);

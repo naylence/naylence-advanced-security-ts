@@ -9,7 +9,7 @@ import {
   type AuthorizationPolicyConfig,
 } from "@naylence/runtime";
 
-import type { ExpressionLimits } from "./expr/limits.js";
+import type { ExpressionLimits } from "../../../expr/limits.js";
 
 /**
  * Configuration for creating an AdvancedAuthorizationPolicy via factory.
