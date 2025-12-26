@@ -484,4 +484,401 @@ describe("AdvancedAuthorizationPolicy", () => {
       expect(result.effect).toBe("allow");
     });
   });
+
+  describe("null/undefined handling in when expressions", () => {
+    it("handles missing claims.sub with starts_with (no error)", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "node-rule",
+            effect: "allow",
+            action: "*",
+            when: 'starts_with(claims.sub, "node-")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            claims: {},  // sub is missing
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      // Rule does NOT match (starts_with returns false for null)
+      expect(result.effect).toBe("deny");
+      // Trace should NOT include when_error (expression returned false, not error)
+      const ruleTrace = result.evaluationTrace.find(t => t.ruleId === "node-rule");
+      expect(ruleTrace).toBeDefined();
+      expect(ruleTrace!.expression).toContain("evaluated to false");
+    });
+
+    it("handles claims.sub as undefined (no error)", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "node-rule",
+            effect: "allow",
+            action: "*",
+            when: 'starts_with(claims.sub, "node-")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            claims: { sub: undefined as unknown as string },  // sub is undefined
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      // Rule does NOT match (undefined normalized to null, starts_with returns false)
+      expect(result.effect).toBe("deny");
+      // Trace should NOT include when_error
+      const ruleTrace = result.evaluationTrace.find(t => t.ruleId === "node-rule");
+      expect(ruleTrace).toBeDefined();
+      expect(ruleTrace!.expression).not.toContain("error");
+    });
+
+    it("handles claims.sub as number (includes error in trace)", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "node-rule",
+            effect: "allow",
+            action: "*",
+            when: 'starts_with(claims.sub, "node-")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            claims: { sub: 12345 as unknown as string },  // sub is wrong type
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      // Rule does NOT match (wrong type causes error)
+      expect(result.effect).toBe("deny");
+      // Trace should include when_error
+      const ruleTrace = result.evaluationTrace.find(t => t.ruleId === "node-rule");
+      expect(ruleTrace).toBeDefined();
+      expect(ruleTrace!.expression).toContain("error");
+    });
+
+    it("handles valid claims.sub (rule matches)", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "node-rule",
+            effect: "allow",
+            action: "*",
+            when: 'starts_with(claims.sub, "node-")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            claims: { sub: "node-123" },  // valid sub
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      // Rule matches
+      expect(result.effect).toBe("allow");
+      expect(result.matchedRule).toBe("node-rule");
+    });
+
+    it("handles null scope in has_scope (no error)", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "scope-rule",
+            effect: "allow",
+            action: "*",
+            when: "has_scope(claims.requiredScope)",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            claims: { requiredScope: null as unknown as string },
+            grantedScopes: ["admin"],
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      // Rule does NOT match (has_scope returns false for null)
+      expect(result.effect).toBe("deny");
+      // No error in trace
+      const ruleTrace = result.evaluationTrace.find(t => t.ruleId === "scope-rule");
+      expect(ruleTrace).toBeDefined();
+      expect(ruleTrace!.expression).not.toContain("error");
+    });
+
+    it("handles contains with missing field (no error)", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "email-rule",
+            effect: "allow",
+            action: "*",
+            when: 'contains(claims.email, "@example.com")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            claims: {},  // email is missing
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      // Rule does NOT match (contains returns false for null)
+      expect(result.effect).toBe("deny");
+    });
+
+    it("handles glob_match with null value (no error)", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "pattern-rule",
+            effect: "allow",
+            action: "*",
+            when: 'glob_match(claims.resource, "service.*")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            claims: { resource: null as unknown as string },
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      // Rule does NOT match
+      expect(result.effect).toBe("deny");
+    });
+
+    it("handles regex_match with undefined property (no error)", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "regex-rule",
+            effect: "allow",
+            action: "*",
+            when: 'regex_match(claims.userId, "user-\\\\d+")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            claims: {},  // userId is missing
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      // Rule does NOT match
+      expect(result.effect).toBe("deny");
+    });
+
+    it("handles ends_with with valid match", async () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            id: "domain-rule",
+            effect: "allow",
+            action: "*",
+            when: 'ends_with(claims.email, "@corp.example.com")',
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      const policy = createPolicy(definition);
+      const node = createMockNode();
+      const envelope = createMockEnvelope();
+      const context: MockContext = {
+        security: {
+          authorization: {
+            claims: { email: "user@corp.example.com" },
+          },
+        },
+      };
+
+      const result = await policy.evaluateRequest(
+        node as never,
+        envelope as never,
+        context as never,
+        "*"
+      );
+
+      expect(result.effect).toBe("allow");
+    });
+  });
+
+  describe("parameterized null handling tests", () => {
+    it.each([
+      // [description, whenExpr, claims, expectedEffect, shouldHaveError]
+      ["missing property", 'starts_with(claims.sub, "x")', {}, "deny", false],
+      ["null property", 'starts_with(claims.sub, "x")', { sub: null }, "deny", false],
+      ["undefined property", 'ends_with(claims.sub, "x")', { sub: undefined }, "deny", false],
+      ["wrong type number", 'contains(claims.sub, "x")', { sub: 42 }, "deny", true],
+      ["wrong type object", 'glob_match(claims.sub, "*")', { sub: {} }, "deny", true],
+      ["valid match", 'starts_with(claims.sub, "test")', { sub: "test-123" }, "allow", false],
+      ["valid no match", 'starts_with(claims.sub, "other")', { sub: "test-123" }, "deny", false],
+    ])(
+      "%s: when expression returns expected effect",
+      async (_, whenExpr, claims, expectedEffect, shouldHaveError) => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "test-rule",
+              effect: "allow",
+              action: "*",
+              when: whenExpr,
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope = createMockEnvelope();
+        const context: MockContext = {
+          security: {
+            authorization: { claims: claims as Record<string, unknown> },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          context as never,
+          "*"
+        );
+
+        expect(result.effect).toBe(expectedEffect);
+
+        const trace = result.evaluationTrace.find(t => t.ruleId === "test-rule");
+        if (shouldHaveError) {
+          expect(trace?.expression).toContain("error");
+        } else if (expectedEffect === "deny") {
+          expect(trace?.expression).not.toContain("error");
+        }
+      }
+    );
+  });
 });

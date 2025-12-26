@@ -8,6 +8,8 @@ import {
   type FactoryModuleSpec,
 } from "../factory-manifest.js";
 import { getEncryptionManagerFactoryRegistry } from "./encryption/encryption-manager-registry.js";
+// Import to trigger profile registration
+import "./strict-overlay-security-profile.js";
 
 type FactoryRegistrar = Pick<typeof Registry, "registerFactory">;
 

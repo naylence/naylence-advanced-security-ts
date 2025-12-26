@@ -4,3 +4,4 @@ export * from "./encryption/index.js";
 export * from "./keys/index.js";
 export * from "./signing/eddsa-envelope-verifier.js";
 export { registerAdvancedSecurityFactories } from "./register-advanced-security-factories.js";
+export { PROFILE_NAME_STRICT_OVERLAY } from "./strict-overlay-security-profile.js";

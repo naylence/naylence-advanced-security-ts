@@ -2,9 +2,19 @@
  * Built-in functions for the expression language.
  *
  * All built-in functions are pure and deterministic.
+ *
+ * Null handling semantics:
+ * - `undefined` is normalized to `null` throughout the expression value model.
+ * - Predicate-style builtins (starts_with, ends_with, contains, glob_match,
+ *   regex_match, etc.) return `false` when passed `null` for required args
+ *   instead of throwing an error.
+ * - Wrong non-null types still raise BuiltinError to surface real bugs.
+ * - Non-predicate operations (arithmetic, comparisons) remain strict.
  */
 
 import { BuiltinError, EvaluationError } from "./errors.js";
+import { sha256 } from '@noble/hashes/sha256';
+import { generateFingerprintSync } from '@naylence/core';
 import {
   checkGlobPatternLength,
   checkRegexPatternLength,
@@ -13,6 +23,9 @@ import {
 
 /**
  * Runtime value types for the expression language.
+ *
+ * Note: `undefined` is NOT a valid ExprValue. Any JavaScript `undefined`
+ * values should be normalized to `null` before entering the expression system.
  */
 export type ExprValue =
   | string
@@ -21,6 +34,45 @@ export type ExprValue =
   | null
   | readonly ExprValue[]
   | { readonly [key: string]: ExprValue };
+
+/**
+ * Normalizes a JavaScript value to an ExprValue.
+ *
+ * Rules:
+ * - `undefined` -> `null`
+ * - `null` -> `null`
+ * - boolean/number/string -> returned as-is
+ * - array -> elements are recursively normalized
+ * - object -> returned as-is (reads will normalize on access)
+ * - other types (function, symbol, etc.) -> `null`
+ *
+ * This ensures `undefined` never leaks into the expression value model.
+ */
+export function normalizeJsValue(value: unknown): ExprValue {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  if (typeof value === "boolean" || typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((element) => normalizeJsValue(element));
+  }
+
+  if (typeof value === "object") {
+    // Return the object as-is; reads will normalize on access
+    return value as { readonly [key: string]: ExprValue };
+  }
+
+  // Function, symbol, bigint, etc. -> null
+  return null;
+}
 
 /**
  * Signature of a built-in function.
@@ -70,6 +122,35 @@ function assertString(
       `${argName} must be a string, got ${getTypeName(value)}`
     );
   }
+}
+
+/**
+ * Checks if a value is null (for null-tolerant predicates).
+ */
+function isNull(value: ExprValue): value is null {
+  return value === null;
+}
+
+/**
+ * Asserts that a non-null value is a string (for null-tolerant predicates).
+ * Returns false if the value is null (indicating predicate should return false).
+ * Throws BuiltinError if the value is non-null but not a string.
+ */
+function assertStringOrNull(
+  value: ExprValue,
+  argName: string,
+  functionName: string
+): value is string {
+  if (isNull(value)) {
+    return false;
+  }
+  if (typeof value !== "string") {
+    throw new BuiltinError(
+      functionName,
+      `${argName} must be a string, got ${getTypeName(value)}`
+    );
+  }
+  return true;
 }
 
 /**
@@ -155,13 +236,15 @@ const upper: BuiltinFunction = (args) => {
  * starts_with(s: string, prefix: string) -> bool
  *
  * Returns true if the string starts with the prefix.
+ * Null-tolerant: returns false if either argument is null.
  */
 const starts_with: BuiltinFunction = (args) => {
   assertArgCount(args, 2, "starts_with");
   const s = getArg(args, 0, "starts_with");
   const prefix = getArg(args, 1, "starts_with");
-  assertString(s, "s", "starts_with");
-  assertString(prefix, "prefix", "starts_with");
+  // Null-tolerant: return false if either arg is null
+  if (!assertStringOrNull(s, "s", "starts_with")) return false;
+  if (!assertStringOrNull(prefix, "prefix", "starts_with")) return false;
   return s.startsWith(prefix);
 };
 
@@ -169,13 +252,15 @@ const starts_with: BuiltinFunction = (args) => {
  * ends_with(s: string, suffix: string) -> bool
  *
  * Returns true if the string ends with the suffix.
+ * Null-tolerant: returns false if either argument is null.
  */
 const ends_with: BuiltinFunction = (args) => {
   assertArgCount(args, 2, "ends_with");
   const s = getArg(args, 0, "ends_with");
   const suffix = getArg(args, 1, "ends_with");
-  assertString(s, "s", "ends_with");
-  assertString(suffix, "suffix", "ends_with");
+  // Null-tolerant: return false if either arg is null
+  if (!assertStringOrNull(s, "s", "ends_with")) return false;
+  if (!assertStringOrNull(suffix, "suffix", "ends_with")) return false;
   return s.endsWith(suffix);
 };
 
@@ -183,13 +268,15 @@ const ends_with: BuiltinFunction = (args) => {
  * contains(s: string, substring: string) -> bool
  *
  * Returns true if the string contains the substring.
+ * Null-tolerant: returns false if either argument is null.
  */
 const contains: BuiltinFunction = (args) => {
   assertArgCount(args, 2, "contains");
   const s = getArg(args, 0, "contains");
   const substring = getArg(args, 1, "contains");
-  assertString(s, "s", "contains");
-  assertString(substring, "substring", "contains");
+  // Null-tolerant: return false if either arg is null
+  if (!assertStringOrNull(s, "s", "contains")) return false;
+  if (!assertStringOrNull(substring, "substring", "contains")) return false;
   return s.includes(substring);
 };
 
@@ -234,6 +321,112 @@ const len: BuiltinFunction = (args) => {
     "len",
     `expected string or array, got ${getTypeName(x)}`
   );
+};
+
+// ============================================================
+// Generic Helpers
+// ============================================================
+
+/**
+ * exists(x: any) -> bool
+ *
+ * Returns true if the value is not null.
+ * Missing bindings and missing properties evaluate to null, so this
+ * can be used to check for presence.
+ */
+const exists: BuiltinFunction = (args) => {
+  assertArgCount(args, 1, "exists");
+  const x = getArg(args, 0, "exists");
+  return x !== null;
+};
+
+/**
+ * coalesce(a: any, b: any) -> any
+ *
+ * Returns `a` if it is not null, otherwise returns `b`.
+ * This is useful for providing default values.
+ */
+const coalesce: BuiltinFunction = (args) => {
+  assertArgCount(args, 2, "coalesce");
+  const a = getArg(args, 0, "coalesce");
+  const b = getArg(args, 1, "coalesce");
+  return a !== null ? a : b;
+};
+
+/**
+ * trim(s: string) -> string
+ *
+ * Trims whitespace from both ends of a string.
+ * Returns an empty string if `s` is null (for convenient composition).
+ * Throws BuiltinError if `s` is non-null but not a string.
+ */
+const trim: BuiltinFunction = (args) => {
+  assertArgCount(args, 1, "trim");
+  const s = getArg(args, 0, "trim");
+  
+  // Null-friendly: return empty string for null
+  if (s === null) {
+    return "";
+  }
+  
+  // Strict type check for non-null values
+  if (typeof s !== "string") {
+    throw new BuiltinError(
+      "trim",
+      `s must be a string, got ${getTypeName(s)}`
+    );
+  }
+  
+  return s.trim();
+};
+
+/**
+ * secure_hash(input_str: string, length: number) -> string
+ *
+ * Generates a deterministic secure hash/fingerprint of the input string.
+ * Uses SHA-256 hashing to create a stable identifier of the specified length.
+ * Returns base62-encoded string (alphanumeric, case-sensitive).
+ * Automatically rehashes if result contains blacklisted words.
+ * Returns empty string if input_str is null (for convenient composition).
+ * Throws BuiltinError if input_str is non-null but not a string, or if length is invalid.
+ */
+const secure_hash: BuiltinFunction = (args) => {
+  assertArgCount(args, 2, "secure_hash");
+  const input_str = getArg(args, 0, "secure_hash");
+  const length = getArg(args, 1, "secure_hash");
+  
+  // Null-friendly: return empty string for null input
+  if (input_str === null) {
+    return "";
+  }
+  
+  // Strict type check for input_str
+  if (typeof input_str !== "string") {
+    throw new BuiltinError(
+      "secure_hash",
+      `input_str must be a string, got ${getTypeName(input_str)}`
+    );
+  }
+  
+  // Strict type check for length
+  if (typeof length !== "number") {
+    throw new BuiltinError(
+      "secure_hash",
+      `length must be a number, got ${getTypeName(length)}`
+    );
+  }
+  
+  // Validate length is a positive integer
+  if (!Number.isInteger(length) || length <= 0) {
+    throw new BuiltinError(
+      "secure_hash",
+      `length must be a positive integer, got ${length}`
+    );
+  }
+  
+  // Use generateFingerprintSync from @naylence/core
+  // This provides SHA-256 hashing, base62 encoding, and profanity filtering
+  return generateFingerprintSync(input_str, length, sha256);
 };
 
 // ============================================================
@@ -284,13 +477,15 @@ function globToRegex(glob: string): string {
  *
  * Returns true if the value matches the glob pattern.
  * Glob syntax: * (single segment), ** (any depth), ? (single char)
+ * Null-tolerant: returns false if either argument is null.
  */
 const glob_match: BuiltinFunction = (args, context) => {
   assertArgCount(args, 2, "glob_match");
   const value = getArg(args, 0, "glob_match");
   const pattern = getArg(args, 1, "glob_match");
-  assertString(value, "value", "glob_match");
-  assertString(pattern, "pattern", "glob_match");
+  // Null-tolerant: return false if either arg is null
+  if (!assertStringOrNull(value, "value", "glob_match")) return false;
+  if (!assertStringOrNull(pattern, "pattern", "glob_match")) return false;
 
   // Validate pattern length
   checkGlobPatternLength(pattern, context.limits);
@@ -339,13 +534,15 @@ function isSafeRegex(pattern: string): boolean {
  *
  * Returns true if the value matches the regex pattern.
  * The pattern is anchored (full match).
+ * Null-tolerant: returns false if either argument is null.
  */
 const regex_match: BuiltinFunction = (args, context) => {
   assertArgCount(args, 2, "regex_match");
   const value = getArg(args, 0, "regex_match");
   const pattern = getArg(args, 1, "regex_match");
-  assertString(value, "value", "regex_match");
-  assertString(pattern, "pattern", "regex_match");
+  // Null-tolerant: return false if either arg is null
+  if (!assertStringOrNull(value, "value", "regex_match")) return false;
+  if (!assertStringOrNull(pattern, "pattern", "regex_match")) return false;
 
   // Validate pattern length
   checkRegexPatternLength(pattern, context.limits);
@@ -391,9 +588,15 @@ export const BUILTIN_FUNCTIONS: FunctionRegistry = new Map([
   ["ends_with", ends_with],
   ["contains", contains],
   ["split", split],
+  ["trim", trim],
 
   // Collection helpers
   ["len", len],
+
+  // Generic helpers
+  ["exists", exists],
+  ["coalesce", coalesce],
+  ["secure_hash", secure_hash],
 
   // Pattern helpers
   ["glob_match", glob_match],

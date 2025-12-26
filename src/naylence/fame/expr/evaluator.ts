@@ -2,6 +2,12 @@
  * Expression evaluator.
  *
  * Evaluates an AST against a set of variable bindings and returns a value.
+ *
+ * Null handling semantics:
+ * - `undefined` values are normalized to `null` throughout evaluation.
+ * - Missing identifiers evaluate to `null`.
+ * - Member access on `null` or non-object returns `null`.
+ * - Missing properties return `null` (including properties set to `undefined`).
  */
 
 import type { AstNode, BinaryOperator, UnaryOperator } from "./ast.js";
@@ -9,6 +15,7 @@ import {
   BUILTIN_FUNCTIONS,
   callBuiltin,
   getTypeName,
+  normalizeJsValue,
   type BuiltinContext,
   type ExprValue,
   type FunctionRegistry,
@@ -129,7 +136,8 @@ export class Evaluator {
   private evaluateIdentifier(name: string, _position: number): ExprValue {
     // Check if it's a top-level binding
     if (name in this.context.bindings) {
-      return this.context.bindings[name] as ExprValue;
+      // Normalize the value to ensure undefined becomes null
+      return normalizeJsValue(this.context.bindings[name]);
     }
 
     // Unknown identifier evaluates to null (missing field)
@@ -163,9 +171,10 @@ export class Evaluator {
         return null;
       }
 
-      const record = obj as Record<string, ExprValue>;
+      const record = obj as Record<string, unknown>;
       if (node.property in record) {
-        return record[node.property] as ExprValue;
+        // Normalize the value to ensure undefined becomes null
+        return normalizeJsValue(record[node.property]);
       }
 
       // Missing property evaluates to null
@@ -201,7 +210,8 @@ export class Evaluator {
         // Out of bounds evaluates to null
         return null;
       }
-      return obj[intIndex] as ExprValue;
+      // Normalize array element to ensure undefined becomes null
+      return normalizeJsValue(obj[intIndex]);
     }
 
     // Object access with string key
@@ -214,9 +224,10 @@ export class Evaluator {
           this.source
         );
       }
-      const record = obj as Record<string, ExprValue>;
+      const record = obj as Record<string, unknown>;
       if (index in record) {
-        return record[index] as ExprValue;
+        // Normalize the value to ensure undefined becomes null
+        return normalizeJsValue(record[index]);
       }
       // Missing key evaluates to null
       return null;

@@ -33,6 +33,7 @@ export {
   callBuiltin,
   isBuiltinFunction,
   getTypeName,
+  normalizeJsValue,
   type ExprValue,
   type BuiltinFunction,
   type BuiltinContext,

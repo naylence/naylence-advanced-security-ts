@@ -40,6 +40,10 @@ const advancedSecurityPlugin: FamePlugin = {
       try {
         // console.log('[naylence:advanced-security] registering advanced security factories...');
         await registerAdvancedSecurityPluginFactories();
+        
+        // Import modules with side-effect registrations (not in manifest)
+        await import('./naylence/fame/security/strict-overlay-security-profile.js');
+        
         // console.log('[naylence:advanced-security] advanced security factories registered');
         initialized = true;
       } finally {

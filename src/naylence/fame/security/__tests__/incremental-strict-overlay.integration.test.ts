@@ -1069,22 +1069,47 @@ describe("Incremental strict-overlay security integration", () => {
         to: formatAddress("__sys__", parent.physicalPath!), // Send to parent's system inbox
       });
 
+      // Debug: Check security manager components
+      const childSm = child.securityManager as DefaultSecurityManager;
+      console.error("[DEBUG] Child security manager components:");
+      console.error("  policy:", childSm?.policy?.constructor?.name ?? "null");
+      console.error("  _keyManager:", Boolean((childSm as unknown as Record<string, unknown>)?._keyManager));
+      console.error("  _encryptionManager:", Boolean((childSm as unknown as Record<string, unknown>)?._encryptionManager));
+      console.error("  _envelopeSecurityHandler:", Boolean((childSm as unknown as Record<string, unknown>)?._envelopeSecurityHandler));
+      console.error("  _keyManagementHandler:", Boolean((childSm as unknown as Record<string, unknown>)?._keyManagementHandler));
+      if (childSm?.policy) {
+        const reqs = childSm.policy.requirements?.();
+        console.error("  policy.requirements():", JSON.stringify(reqs, null, 2).substring(0, 500));
+        // Check policy encryption property 
+        const policyAsAny = childSm.policy as unknown as { encryption?: { outbound?: { defaultLevel?: string } } };
+        console.error("  policy.encryption?.outbound?.defaultLevel:", policyAsAny?.encryption?.outbound?.defaultLevel);
+      }
+
       // Track encryption by checking security handler logs
       let encryptionApplied = false;
+      let capturedLogs: string[] = [];
+      let allLogs: string[] = [];
       basicConfig({ level: LogLevel.DEBUG });
       const logSpy = jest
         .spyOn(console, "log")
         .mockImplementation((message) => {
-          if (
-            typeof message === "string" &&
-            message.includes("outbound_crypto_level_decided") &&
-            message.includes("crypto_level=channel")
-          ) {
-            encryptionApplied = true;
+          if (typeof message === "string") {
+            allLogs.push(message);
+            if (message.includes("outbound_crypto_level_decided")) {
+              capturedLogs.push(message);
+              if (message.includes("crypto_level=channel")) {
+                encryptionApplied = true;
+              }
+            }
           }
         });
 
       await child.send(testEnvelope);
+      console.error("[DEBUG] Total logs captured:", allLogs.length);
+      console.error("[DEBUG] Logs containing 'crypto':", allLogs.filter(l => l.includes("crypto")));
+      console.error("[DEBUG] Security handler logs:", allLogs.filter(l => l.includes("envelope_security_handler")));
+      console.error("[DEBUG] First 5 logs:", allLogs.slice(0, 5));
+      console.error("[DEBUG] Captured crypto_level logs:", capturedLogs);
 
       // Wait a bit for encryption processing
       await new Promise((resolve) => setTimeout(resolve, 100));
