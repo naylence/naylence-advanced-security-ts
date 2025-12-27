@@ -55,6 +55,9 @@ export const VALID_FRAME_TYPES = [
   "CreditUpdate",
   "KeyAnnounce",
   "KeyRequest",
+  "SecureOpen",
+  "SecureAccept",
+  "SecureClose",
 ] as const;
 
 import type { NodeLike } from "@naylence/runtime";

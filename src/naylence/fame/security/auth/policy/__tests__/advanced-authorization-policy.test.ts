@@ -261,6 +261,54 @@ describe("AdvancedAuthorizationPolicy", () => {
       );
     });
 
+    it("accepts valid frame type SecureOpen", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "SecureOpen",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).not.toThrow();
+    });
+
+    it("accepts valid frame type SecureAccept", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "SecureAccept",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).not.toThrow();
+    });
+
+    it("accepts valid frame type SecureClose", () => {
+      const definition: AuthorizationPolicyDefinition = {
+        version: "1.0.0",
+        rules: [
+          {
+            effect: "allow",
+            action: "*",
+            frame_type: "SecureClose",
+          },
+        ],
+        default_effect: "deny",
+      };
+
+      expect(() => createPolicy(definition)).not.toThrow();
+    });
+
     it("accepts all enforceable frame types", () => {
       const definition: AuthorizationPolicyDefinition = {
         version: "1.0.0",
@@ -284,6 +332,9 @@ describe("AdvancedAuthorizationPolicy", () => {
               "NodeHeartbeatAck",
               "KeyAnnounce",
               "KeyRequest",
+              "SecureOpen",
+              "SecureAccept",
+              "SecureClose",
             ],
           },
         ],
