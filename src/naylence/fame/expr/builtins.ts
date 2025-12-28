@@ -13,7 +13,7 @@
  */
 
 import { BuiltinError, EvaluationError } from "./errors.js";
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2';
 import { generateFingerprintSync } from '@naylence/core';
 import {
   checkGlobPatternLength,

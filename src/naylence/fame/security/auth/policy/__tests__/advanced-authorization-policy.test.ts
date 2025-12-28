@@ -619,8 +619,9 @@ describe("AdvancedAuthorizationPolicy", () => {
       );
 
       // Check that traces contain error info
-      expect(result.evaluationTrace.length).toBeGreaterThan(0);
-      const trace = result.evaluationTrace[0];
+      expect(result.evaluationTrace).toBeDefined();
+      expect(result.evaluationTrace!.length).toBeGreaterThan(0);
+      const trace = result.evaluationTrace![0];
       expect(trace).toBeDefined();
     });
   });
@@ -818,7 +819,8 @@ describe("AdvancedAuthorizationPolicy", () => {
       // Rule does NOT match (starts_with returns false for null)
       expect(result.effect).toBe("deny");
       // Trace should NOT include when_error (expression returned false, not error)
-      const ruleTrace = result.evaluationTrace.find(t => t.ruleId === "node-rule");
+      expect(result.evaluationTrace).toBeDefined();
+      const ruleTrace = result.evaluationTrace!.find(t => t.ruleId === "node-rule");
       expect(ruleTrace).toBeDefined();
       expect(ruleTrace!.expression).toContain("evaluated to false");
     });
@@ -858,7 +860,8 @@ describe("AdvancedAuthorizationPolicy", () => {
       // Rule does NOT match (undefined normalized to null, starts_with returns false)
       expect(result.effect).toBe("deny");
       // Trace should NOT include when_error
-      const ruleTrace = result.evaluationTrace.find(t => t.ruleId === "node-rule");
+      expect(result.evaluationTrace).toBeDefined();
+      const ruleTrace = result.evaluationTrace!.find(t => t.ruleId === "node-rule");
       expect(ruleTrace).toBeDefined();
       expect(ruleTrace!.expression).not.toContain("error");
     });
@@ -898,7 +901,8 @@ describe("AdvancedAuthorizationPolicy", () => {
       // Rule does NOT match (wrong type causes error)
       expect(result.effect).toBe("deny");
       // Trace should include when_error
-      const ruleTrace = result.evaluationTrace.find(t => t.ruleId === "node-rule");
+      expect(result.evaluationTrace).toBeDefined();
+      const ruleTrace = result.evaluationTrace!.find(t => t.ruleId === "node-rule");
       expect(ruleTrace).toBeDefined();
       expect(ruleTrace!.expression).toContain("error");
     });
@@ -976,7 +980,8 @@ describe("AdvancedAuthorizationPolicy", () => {
       // Rule does NOT match (has_scope returns false for null)
       expect(result.effect).toBe("deny");
       // No error in trace
-      const ruleTrace = result.evaluationTrace.find(t => t.ruleId === "scope-rule");
+      expect(result.evaluationTrace).toBeDefined();
+      const ruleTrace = result.evaluationTrace!.find(t => t.ruleId === "scope-rule");
       expect(ruleTrace).toBeDefined();
       expect(ruleTrace!.expression).not.toContain("error");
     });
@@ -1169,7 +1174,8 @@ describe("AdvancedAuthorizationPolicy", () => {
 
         expect(result.effect).toBe(expectedEffect);
 
-        const trace = result.evaluationTrace.find(t => t.ruleId === "test-rule");
+        expect(result.evaluationTrace).toBeDefined();
+        const trace = result.evaluationTrace!.find(t => t.ruleId === "test-rule");
         if (shouldHaveError) {
           expect(trace?.expression).toContain("error");
         } else if (expectedEffect === "deny") {
@@ -1441,7 +1447,8 @@ describe("AdvancedAuthorizationPolicy", () => {
       );
 
       expect(result.effect).toBe("deny");
-      const trace = result.evaluationTrace.find((t) => t.ruleId === "mismatch-check");
+      expect(result.evaluationTrace).toBeDefined();
+      const trace = result.evaluationTrace!.find((t) => t.ruleId === "mismatch-check");
       expect(trace?.expression).toContain("evaluated to false");
     });
   });
