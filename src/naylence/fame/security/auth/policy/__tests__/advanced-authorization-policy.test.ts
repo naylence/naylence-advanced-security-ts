@@ -1452,4 +1452,932 @@ describe("AdvancedAuthorizationPolicy", () => {
       expect(trace?.expression).toContain("evaluated to false");
     });
   });
+
+  describe("security posture builtins in when expressions", () => {
+    // Extended mock types for security testing
+    type MockSecurityEnvelope = MockEnvelope & {
+      sec?: {
+        sig?: { kid?: string; val?: string };
+        enc?: { alg?: string; kid?: string; val?: string };
+      };
+      sid?: string;
+    };
+
+    describe("is_signed() builtin", () => {
+      it("allows when envelope is signed", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-signature",
+              effect: "allow",
+              action: "*",
+              when: "is_signed()",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            sig: { kid: "key-123", val: "signature-value" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+        expect(result.matchedRule).toBe("require-signature");
+      });
+
+      it("denies when envelope is not signed", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-signature",
+              effect: "allow",
+              action: "*",
+              when: "is_signed()",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          // No sec header
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("deny");
+        expect(result.evaluationTrace).toBeDefined();
+        const trace = result.evaluationTrace!.find(
+          (t) => t.ruleId === "require-signature"
+        );
+        expect(trace?.expression).toContain("evaluated to false");
+      });
+
+      it("denies when envelope has enc but no sig", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-signature",
+              effect: "allow",
+              action: "*",
+              when: "is_signed()",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "ECDH-ES+A256GCM", val: "encrypted-data" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("deny");
+      });
+    });
+
+    describe("is_encrypted() builtin", () => {
+      it("allows when envelope is encrypted", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-encryption",
+              effect: "allow",
+              action: "*",
+              when: "is_encrypted()",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "ECDH-ES+A256GCM", val: "encrypted-data" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+        expect(result.matchedRule).toBe("require-encryption");
+      });
+
+      it("denies when envelope is not encrypted", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-encryption",
+              effect: "allow",
+              action: "*",
+              when: "is_encrypted()",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("deny");
+      });
+    });
+
+    describe("encryption_level() builtin", () => {
+      it("exposes encryption level for comparison", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "check-sealed",
+              effect: "allow",
+              action: "*",
+              when: 'encryption_level() == "sealed"',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "ECDH-ES+A256GCM" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+
+      it("returns plaintext for no encryption", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "check-plaintext",
+              effect: "allow",
+              action: "*",
+              when: 'encryption_level() == "plaintext"',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+    });
+
+    describe("is_encrypted_at_least(level) builtin", () => {
+      it('allows channel encryption for "channel" requirement', async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-channel",
+              effect: "allow",
+              action: "*",
+              when: 'is_encrypted_at_least("channel")',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "chacha20-poly1305-channel" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+
+      it('allows sealed encryption for "channel" requirement', async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-channel",
+              effect: "allow",
+              action: "*",
+              when: 'is_encrypted_at_least("channel")',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "ECDH-ES+A256GCM" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+
+      it('denies plaintext for "channel" requirement', async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-channel",
+              effect: "allow",
+              action: "*",
+              when: 'is_encrypted_at_least("channel")',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("deny");
+      });
+
+      it('denies channel encryption for "sealed" requirement', async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-sealed",
+              effect: "allow",
+              action: "*",
+              when: 'is_encrypted_at_least("sealed")',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "chacha20-poly1305-channel" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("deny");
+      });
+
+      it('denies unknown encryption for "channel" requirement (conservative)', async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-channel",
+              effect: "allow",
+              action: "*",
+              when: 'is_encrypted_at_least("channel")',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "custom-unknown-algo" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("deny");
+      });
+
+      it('allows any envelope for "plaintext" requirement', async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-plaintext",
+              effect: "allow",
+              action: "*",
+              when: 'is_encrypted_at_least("plaintext")',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+    });
+
+    describe("envelope.sec bindings in expressions", () => {
+      it("accesses sec.sig.present in when expression", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "check-sig-present",
+              effect: "allow",
+              action: "*",
+              when: "envelope.sec.sig.present == true",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            sig: { kid: "key-1" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+
+      it("accesses sec.sig.kid in when expression", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "check-sig-kid",
+              effect: "allow",
+              action: "*",
+              when: 'starts_with(envelope.sec.sig.kid, "trusted-")',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            sig: { kid: "trusted-key-123" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+
+      it("accesses sec.enc.level in when expression", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "check-enc-level",
+              effect: "allow",
+              action: "*",
+              when: 'envelope.sec.enc.level == "sealed"',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "ECDH-ES+A256GCM" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+
+      it("does not expose sec.sig.val in bindings", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "check-no-val",
+              effect: "allow",
+              action: "*",
+              when: "envelope.sec.sig.val == null",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            sig: { kid: "key-1", val: "secret-signature" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        // val should be undefined/null in bindings, not the actual value
+        expect(result.effect).toBe("allow");
+      });
+
+      it("does not expose sec.enc.val in bindings", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "check-no-enc-val",
+              effect: "allow",
+              action: "*",
+              when: "envelope.sec.enc.val == null",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "ECDH-ES+A256GCM", val: "encrypted-content" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        // val should be undefined/null in bindings, not the actual value
+        expect(result.effect).toBe("allow");
+      });
+    });
+
+    describe("envelope.sid binding", () => {
+      it("accesses envelope.sid in when expression", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "check-sid",
+              effect: "allow",
+              action: "*",
+              when: 'envelope.sid == "source-system-hash"',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          sid: "source-system-hash",
+          frame: { type: "Data" },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+
+      it("envelope.sid is null when not present", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "check-sid-null",
+              effect: "allow",
+              action: "*",
+              when: "envelope.sid == null",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+    });
+
+    describe("combined security conditions", () => {
+      it("requires both signature and encryption", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-both",
+              effect: "allow",
+              action: "*",
+              when: "is_signed() && is_encrypted()",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            sig: { kid: "sig-key" },
+            enc: { alg: "ECDH-ES+A256GCM" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+
+      it("denies when only signed (requires both)", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "require-both",
+              effect: "allow",
+              action: "*",
+              when: "is_signed() && is_encrypted()",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            sig: { kid: "sig-key" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("deny");
+      });
+
+      it("combines security with scope requirements", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "secure-admin",
+              effect: "allow",
+              action: "*",
+              when: 'is_signed() && is_encrypted_at_least("channel") && has_scope("admin")',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            sig: { kid: "sig-key" },
+            enc: { alg: "ECDH-ES+A256GCM" },
+          },
+        };
+        const context: MockContext = {
+          security: {
+            authorization: {
+              grantedScopes: ["admin", "read"],
+            },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          context as never,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+
+      it("combines security with address pattern", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "secure-to-api",
+              effect: "allow",
+              action: "*",
+              address: "api/**",
+              when: "is_signed()",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          to: "api/v1/users",
+          frame: { type: "Data" },
+          sec: {
+            sig: { kid: "sig-key" },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        expect(result.effect).toBe("allow");
+      });
+    });
+
+    describe("error handling in security expressions", () => {
+      it("surfaces evaluation error for invalid is_encrypted_at_least arg", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "invalid-level",
+              effect: "allow",
+              action: "*",
+              when: 'is_encrypted_at_least("invalid_level")',
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          undefined,
+          "*"
+        );
+
+        // Invalid arg should cause evaluation error, rule doesn't match
+        expect(result.effect).toBe("deny");
+        expect(result.evaluationTrace).toBeDefined();
+        const trace = result.evaluationTrace!.find(
+          (t) => t.ruleId === "invalid-level"
+        );
+        expect(trace?.expression).toContain("evaluation error");
+      });
+
+      it("handles null-tolerant is_encrypted_at_least gracefully", async () => {
+        const definition: AuthorizationPolicyDefinition = {
+          version: "1.0.0",
+          rules: [
+            {
+              id: "null-level",
+              effect: "allow",
+              action: "*",
+              when: "is_encrypted_at_least(claims.level)",
+            },
+          ],
+          default_effect: "deny",
+        };
+
+        const policy = createPolicy(definition);
+        const node = createMockNode();
+        const envelope: MockSecurityEnvelope = {
+          id: "env-1",
+          frame: { type: "Data" },
+          sec: {
+            enc: { alg: "ECDH-ES+A256GCM" },
+          },
+        };
+        const context: MockContext = {
+          security: {
+            authorization: {
+              claims: { level: null },
+            },
+          },
+        };
+
+        const result = await policy.evaluateRequest(
+          node as never,
+          envelope as never,
+          context as never,
+          "*"
+        );
+
+        // null arg returns false (null-tolerant), rule doesn't match
+        expect(result.effect).toBe("deny");
+        expect(result.evaluationTrace).toBeDefined();
+        const trace = result.evaluationTrace!.find(
+          (t) => t.ruleId === "null-level"
+        );
+        expect(trace?.expression).toContain("evaluated to false");
+      });
+    });
+  });
 });

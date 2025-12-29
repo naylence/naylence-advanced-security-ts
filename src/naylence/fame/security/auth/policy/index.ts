@@ -8,7 +8,14 @@
  */
 
 // Auth expression helpers
-export { createAuthFunctionRegistry } from "./expr-builtins.js";
+export {
+  createAuthFunctionRegistry,
+  createSecurityBindings,
+  normalizeEncryptionLevelFromAlg,
+  type AuthFunctionRegistryOptions,
+  type EncryptionLevel,
+  type SecurityBindings,
+} from "./expr-builtins.js";
 
 // Expression authorization policy
 export {

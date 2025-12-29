@@ -70,7 +70,11 @@ import {
 import type { ExprValue, FunctionRegistry } from "../../../expr/builtins.js";
 import type { ExpressionLimits } from "../../../expr/limits.js";
 import { DEFAULT_EXPRESSION_LIMITS } from "../../../expr/limits.js";
-import { createAuthFunctionRegistry } from "./expr-builtins.js";
+import {
+  createAuthFunctionRegistry,
+  createSecurityBindings,
+  type SecurityBindings,
+} from "./expr-builtins.js";
 
 /**
  * Logger interface for minimal logging dependency.
@@ -186,22 +190,39 @@ function extractClaims(
 
 /**
  * Creates a safe envelope subset for expression bindings.
+ *
+ * Exposes:
+ * - id, sid, traceId, corrId, flowId, to
+ * - frame: { type }
+ * - sec: { sig: { present, kid }, enc: { present, alg, kid, level } }
+ *
+ * IMPORTANT: Does NOT expose raw security values (sig.val, enc.val).
  */
 function createEnvelopeBindings(
   envelope: FameEnvelope
-): Record<string, ExprValue> {
+): { bindings: Record<string, ExprValue>; securityBindings: SecurityBindings } {
   const frame = envelope.frame as Record<string, unknown> | undefined;
   const envelopeRecord = envelope as Record<string, unknown>;
+  const sec = envelopeRecord.sec as
+    | { sig?: { kid?: string }; enc?: { alg?: string; kid?: string } }
+    | undefined;
+
+  const securityBindings = createSecurityBindings(sec);
 
   return {
-    id: envelope.id as string ?? null,
-    traceId: envelopeRecord.traceId as string ?? null,
-    corrId: envelopeRecord.corrId as string ?? null,
-    flowId: envelopeRecord.flowId as string ?? null,
-    to: extractAddress(envelope) ?? null,
-    frame: frame
-      ? { type: (frame.type as string | null) ?? null }
-      : { type: null },
+    bindings: {
+      id: (envelope.id as string) ?? null,
+      sid: (envelopeRecord.sid as string) ?? null,
+      traceId: (envelopeRecord.traceId as string) ?? null,
+      corrId: (envelopeRecord.corrId as string) ?? null,
+      flowId: (envelopeRecord.flowId as string) ?? null,
+      to: extractAddress(envelope) ?? null,
+      frame: frame
+        ? { type: (frame.type as string | null) ?? null }
+        : { type: null },
+      sec: securityBindings as unknown as ExprValue,
+    },
+    securityBindings,
   };
 }
 
@@ -432,11 +453,12 @@ export class AdvancedAuthorizationPolicy implements AuthorizationPolicy {
       }
 
       if (rule.whenAst) {
-        // Lazy initialization of expression bindings
+        // Lazy initialization of expression bindings and security context
         if (!expressionBindings) {
+          const envelopeResult = createEnvelopeBindings(envelope);
           expressionBindings = {
             claims: extractClaims(context),
-            envelope: createEnvelopeBindings(envelope),
+            envelope: envelopeResult.bindings,
             delivery: createDeliveryBindings(context, resolvedAction),
             node: createNodeBindings(node),
             time: {
@@ -444,11 +466,15 @@ export class AdvancedAuthorizationPolicy implements AuthorizationPolicy {
               now_iso: new Date().toISOString(),
             },
           };
+
+          // Create function registry with security bindings for security builtins
+          functionRegistry = createAuthFunctionRegistry({
+            grantedScopes,
+            securityBindings: envelopeResult.securityBindings,
+          });
         }
 
-        const functions: FunctionRegistry =
-          functionRegistry ?? createAuthFunctionRegistry(grantedScopes);
-        functionRegistry = functions;
+        const functions: FunctionRegistry = functionRegistry!;
 
         const evalContext: EvaluationContext = {
           bindings: expressionBindings,
