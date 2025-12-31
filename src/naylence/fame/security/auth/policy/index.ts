@@ -7,16 +7,6 @@
  * @packageDocumentation
  */
 
-// Auth expression helpers
-export {
-  createAuthFunctionRegistry,
-  createSecurityBindings,
-  normalizeEncryptionLevelFromAlg,
-  type AuthFunctionRegistryOptions,
-  type EncryptionLevel,
-  type SecurityBindings,
-} from "./expr-builtins.js";
-
 // Expression authorization policy
 export {
   AdvancedAuthorizationPolicy,
@@ -29,3 +19,18 @@ export {
   FACTORY_META as ADVANCED_AUTHORIZATION_POLICY_FACTORY_META,
   type AdvancedAuthorizationPolicyConfig,
 } from "./advanced-authorization-policy-factory.js";
+
+// HTTP policy source
+export {
+  HttpAuthorizationPolicySource,
+  type HttpAuthorizationPolicySourceOptions,
+  type HttpPolicySourceMetadata,
+  type HttpMethod,
+} from "./http-authorization-policy-source.js";
+
+// HTTP policy source factory
+export {
+  HttpAuthorizationPolicySourceFactory,
+  FACTORY_META as HTTP_AUTHORIZATION_POLICY_SOURCE_FACTORY_META,
+  type HttpAuthorizationPolicySourceConfig,
+} from "./http-authorization-policy-source-factory.js";

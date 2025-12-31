@@ -10,6 +10,7 @@ import {
 import { getEncryptionManagerFactoryRegistry } from "./encryption/encryption-manager-registry.js";
 // Import to trigger profile registration
 import "./strict-overlay-security-profile.js";
+import "./auth/policy-http-authorization-profile.js";
 
 type FactoryRegistrar = Pick<typeof Registry, "registerFactory">;
 
@@ -34,6 +35,7 @@ const EXTRA_MODULES = MODULES.filter(
 );
 
 const NODE_ONLY_MODULES = new Set<FactoryModuleSpec>([
+  "./security/auth/policy/http-authorization-policy-source-factory.js",
   "./security/cert/default-ca-service-factory.js",
   "./security/cert/trust-store/node-trust-store-provider-factory.js",
 ]);

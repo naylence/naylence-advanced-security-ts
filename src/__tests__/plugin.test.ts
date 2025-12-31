@@ -15,6 +15,7 @@ import { FACTORY_META as AFT_LOAD_BALANCER_FACTORY_META } from "../naylence/fame
 import { FACTORY_META as AFT_REPLICA_FACTORY_META } from "../naylence/fame/stickiness/aft-replica-stickiness-manager-factory.js";
 import { FACTORY_META as ADVANCED_WELCOME_FACTORY_META } from "../naylence/fame/welcome/advanced-welcome-service-factory.js";
 import { FACTORY_META as ADVANCED_AUTHORIZATION_POLICY_FACTORY_META } from "../naylence/fame/security/auth/policy/advanced-authorization-policy-factory.js";
+import { FACTORY_META as HTTP_AUTHORIZATION_POLICY_SOURCE_FACTORY_META } from "../naylence/fame/security/auth/policy/http-authorization-policy-source-factory.js";
 
 const expectedFactories = [
   {
@@ -70,6 +71,10 @@ const expectedFactories = [
   {
     base: ADVANCED_AUTHORIZATION_POLICY_FACTORY_META.base,
     key: ADVANCED_AUTHORIZATION_POLICY_FACTORY_META.key,
+  },
+  {
+    base: HTTP_AUTHORIZATION_POLICY_SOURCE_FACTORY_META.base,
+    key: HTTP_AUTHORIZATION_POLICY_SOURCE_FACTORY_META.key,
   },
 ];
 

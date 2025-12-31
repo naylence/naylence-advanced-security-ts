@@ -1,6 +1,6 @@
 {
   "name": "@naylence/advanced-security",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "type": "module",
   "description": "Advanced security utilities for the Naylence Fame runtime implemented in TypeScript.",
   "author": "Naylence Dev <naylencedev@gmail.com>",
@@ -112,7 +112,8 @@
     "dist/browser/index.cjs"
   ],
   "bin": {
-    "naylence-ca-server": "./dist/esm/naylence/fame/security/cert/ca-server-cli.js"
+    "naylence-ca-server": "./dist/esm/naylence/fame/security/cert/ca-server-cli.js",
+    "naylence-policy-server": "./dist/esm/naylence/fame/security/auth/policy/auth-policy-server-cli.js"
   },
   "files": [
     "dist",

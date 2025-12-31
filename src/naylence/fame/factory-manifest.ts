@@ -7,6 +7,7 @@
 
 export const MODULES = [
   "./security/auth/policy/advanced-authorization-policy-factory.js",
+  "./security/auth/policy/http-authorization-policy-source-factory.js",
   "./security/cert/default-ca-service-factory.js",
   "./security/cert/default-certificate-manager-factory.js",
   "./security/cert/trust-store/browser-trust-store-provider-factory.js",
@@ -28,6 +29,7 @@ export type FactoryModuleLoader = () => Promise<Record<string, unknown>>;
 
 export const MODULE_LOADERS: Record<FactoryModuleSpec, FactoryModuleLoader> = {
   "./security/auth/policy/advanced-authorization-policy-factory.js": () => import("./security/auth/policy/advanced-authorization-policy-factory.js"),
+  "./security/auth/policy/http-authorization-policy-source-factory.js": () => import("./security/auth/policy/http-authorization-policy-source-factory.js"),
   "./security/cert/default-ca-service-factory.js": () => import("./security/cert/default-ca-service-factory.js"),
   "./security/cert/default-certificate-manager-factory.js": () => import("./security/cert/default-certificate-manager-factory.js"),
   "./security/cert/trust-store/browser-trust-store-provider-factory.js": () => import("./security/cert/trust-store/browser-trust-store-provider-factory.js"),

@@ -8,7 +8,7 @@
 export { VERSION } from "./version.js";
 
 // Expression engine (browser-safe, uses @noble/hashes)
-export * from "./naylence/fame/expr/index.js";
+// export * from "./naylence/fame/expr/index.js";
 
 // Authorization policy with expression support (browser-safe)
 export * from "./naylence/fame/security/auth/index.js";
