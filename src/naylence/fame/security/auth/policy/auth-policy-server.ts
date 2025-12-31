@@ -12,6 +12,7 @@
  * Authentication:
  * - Set FAME_OAUTH2_ISSUER to enable OAuth2 JWT validation
  * - Optionally set FAME_OAUTH2_AUDIENCE, FAME_OAUTH2_JWKS_URL
+ * - Set FAME_OAUTH2_ALGORITHMS to customize JWT algorithms (default: RS256,ES256,EdDSA)
  * - If no OAuth2 config provided, authentication is disabled (dev mode)
  */
 
@@ -57,6 +58,10 @@ const ENV_VAR_OAUTH2_ISSUER = "FAME_OAUTH2_ISSUER";
 const ENV_VAR_OAUTH2_AUDIENCE = "FAME_OAUTH2_AUDIENCE";
 const ENV_VAR_OAUTH2_JWKS_URL = "FAME_OAUTH2_JWKS_URL";
 const ENV_VAR_OAUTH2_REQUIRED_SCOPES = "FAME_OAUTH2_REQUIRED_SCOPES";
+const ENV_VAR_OAUTH2_ALGORITHMS = "FAME_OAUTH2_ALGORITHMS";
+
+// Default algorithms for JWT verification (matches @naylence/runtime defaults)
+const DEFAULT_JWT_ALGORITHMS = ["RS256", "ES256", "EdDSA"];
 
 // Policy file naming pattern: policy-{id}.yaml or policy-{id}.json
 const POLICY_FILE_PATTERN = /^policy-(.+)\.(ya?ml|json)$/i;
@@ -223,11 +228,17 @@ async function createTokenVerifier(): Promise<TokenVerifier | null> {
       process.env[ENV_VAR_OAUTH2_JWKS_URL] ||
       `${issuer.replace(/\/+$/, "")}/.well-known/jwks.json`;
 
+    // Parse algorithms from environment or use defaults
+    const algorithmsEnv = process.env[ENV_VAR_OAUTH2_ALGORITHMS];
+    const algorithms = algorithmsEnv
+      ? algorithmsEnv.split(",").map((a) => a.trim()).filter(Boolean)
+      : DEFAULT_JWT_ALGORITHMS;
+
     const config = {
       type: "JWKSJWTTokenVerifier" as const,
       issuer,
       jwks_url: jwksUrl,
-      algorithms: ["RS256"],
+      algorithms,
     };
 
     const audience = process.env[ENV_VAR_OAUTH2_AUDIENCE];
